@@ -57,7 +57,7 @@ class Task(BaseTask):
         
     def _play_once(self):
         self.move(self.atom.close_gripper())
-        self.gripper_rotate(self.bottle, 70/180*np.pi, steps=4)
+        self.gripper_rotate(self.bottle, 75/180*np.pi, steps=4)
         if not self.check_mid_success():
             self.move(self.atom.move_by_displacement(
                 rpy=[0, np.pi/6, 0], rpy_coord='gripper'
@@ -71,7 +71,7 @@ class Task(BaseTask):
     def check_mid_success(self):
         rel_pose = self.bottle.get_pose().rebase(self.target_pose)
         return rel_pose[0] > -0.01 \
-            and np.abs(np.dot(rel_pose.to_transformation_matrix()[:3, 0], np.array([0, 0, 1]))) > 0.9
+            and np.abs(np.dot(rel_pose.to_transformation_matrix()[:3, 0], np.array([0, 0, 1]))) > 0.85
     
     def check_early_stop(self):
         rel_pose = self.bottle.get_pose().rebase(self.target_pose)

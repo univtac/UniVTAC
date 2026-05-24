@@ -100,7 +100,7 @@ class Task(BaseTask):
         self.move(self.atom.place_actor(
             self.prism,
             target_pose=self.target_pose,
-            pre_dis=0.0, dis=0.0,
+            pre_dis=0.04, dis=0.0,
             is_open=False
         ), time_dilation_factor=0.5)
         self.delay(20, is_save=False)

@@ -2,7 +2,7 @@ from curobo.geom.transform import pose_multiply
 import numpy as np
 import transforms3d as t3d
 from curobo.types.robot import JointState
-from curobo.util.usd_helper import UsdHelper
+from curobo.util.usd_helper import UsdHelper, WorldConfig
 from curobo.types.math import Pose as CuroboPose
 from curobo.geom.sdf.world import CollisionCheckerType
 from curobo.wrap.reacher.motion_gen import (
@@ -76,7 +76,7 @@ class CuroboPlanner:
             rotation_threshold=0.01,
             high_precision=True,
             collision_checker_type=CollisionCheckerType.MESH,
-            collision_activation_distance=0.4
+            collision_activation_distance=0.0
         )
         self.motion_gen = MotionGen(motion_gen_config)
         self.motion_gen.warmup()
@@ -86,22 +86,12 @@ class CuroboPlanner:
 
     def get_curr_world_cfg(self):
         obstacles = self.usd_helper.get_obstacles_from_stage(
-            only_paths=["/World"],
             reference_prim_path='/World/envs/env_0/Robot',
             ignore_paths=[
                 '/World/visualize',
                 '/World/envs/env_0/Robot',
-                '/World/envs/env_0/ground_plate'
             ]
         ).get_collision_check_world()
-        # obstacles = {
-        #     "cuboid": {
-        #         "table": {
-        #             "dims": [0.5, 0, 0],
-        #             "pose": [-1000, 0.0, 0.0, 1, 0, 0, 0],
-        #         },
-        #     }
-        # }
         return obstacles
 
     def update_world(self):
