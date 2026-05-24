@@ -1,0 +1,21 @@
+# Basic experiment configuration (keep unchanged across policies)
+policy_name: smolvla
+seed: 0
+ckpt_setting: 50
+instruction_type: seen
+instuction_file: null
+
+# ----- SmolVLA-specific deploy parameters -----
+# How many actions from each predicted chunk to execute before re-running the
+# VLA forward pass. 0 means "use the SmolVLAConfig.n_action_steps from the
+# checkpoint" (typically 50).
+smolvla_n_action_steps: 50
+
+# Input image / tactile sizes. SmolVLA's own resize_imgs_with_padding kicks in
+# afterwards, so values here just standardize what we feed the processor.
+smolvla_image_size: [224, 224]
+smolvla_tactile_size: [224, 224]
+
+# Set to true if the trained checkpoint also used the marker-overlay tactile
+# streams (observation.images.tactile_ll_marker / tactile_lr_marker).
+smolvla_use_marker_variants: false
