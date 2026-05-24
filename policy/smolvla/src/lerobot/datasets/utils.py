@@ -21,7 +21,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import lerobot.datasets as datasets
+import datasets
 import numpy as np
 import packaging.version
 import torch

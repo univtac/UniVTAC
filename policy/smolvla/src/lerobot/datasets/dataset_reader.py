@@ -19,7 +19,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-import lerobot.datasets as datasets
+import datasets
 import torch
 
 from .dataset_metadata import LeRobotDatasetMetadata

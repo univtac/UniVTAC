@@ -17,10 +17,10 @@ from collections import deque
 from collections.abc import Callable, Generator, Iterable, Iterator
 from pathlib import Path
 
-import lerobot.datasets as datasets
+import datasets
 import numpy as np
 import torch
-from lerobot.datasets import load_dataset
+from datasets import load_dataset
 
 from lerobot.utils.constants import HF_LEROBOT_HOME, LOOKAHEAD_BACKTRACKTABLE, LOOKBACK_BACKTRACKTABLE
 

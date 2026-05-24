@@ -24,7 +24,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-import lerobot.datasets as datasets
+import datasets
 import numpy as np
 import pandas as pd
 import PIL.Image

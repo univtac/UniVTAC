@@ -20,7 +20,7 @@ import logging
 import shutil
 from pathlib import Path
 
-import lerobot.datasets as datasets
+import datasets
 import pandas as pd
 import tqdm
 

@@ -138,29 +138,37 @@ def gen_video(data_list, keys, save_path, FPS=30, COLS=2, UNI_W=None, UNI_H=None
             for key in keys:
                 imgs.append(to_Image(
                     get_val(frame, key),
-                    f'{"/".join(key)} [{idx}]'
+                    # f'{"/".join(key)} [{idx}]'
                 ))
-
-            if UNI_W is None or UNI_H is None:
-                UNI_W, UNI_H = imgs[0].width, imgs[0].height
-
-            ROWS = np.ceil(len(imgs) / COLS).astype(int)
+            
+            W, H = 480, 270
             opt_array = Image.new(
-                'RGB', (
-                    UNI_W*COLS+20*(COLS-1),
-                    UNI_H*ROWS+20*(ROWS-1)
-                )
+                'RGB', (480+135, 270)
             )
-            for i, img in enumerate(imgs):
-                if img.width > UNI_W or img.height > UNI_H:
-                    img = img.resize((UNI_W, UNI_H))
-                if img.width < UNI_W or img.height < UNI_H:
-                    tmp = Image.new('RGB', (UNI_W, UNI_H), (255, 255, 255))
-                    tmp.paste(img, ((UNI_W-img.width)//2, (UNI_H-img.height)//2))
-                    img = tmp
-                opt_array.paste(img, (
-                    (i%COLS)*(UNI_W+20), (i//COLS)*(UNI_H+20)))
-            opt_array = opt_array.resize(((opt_array.width+15)//16*16, (opt_array.height+15)//16*16))
+            opt_array.paste(imgs[0].resize((W, H)), (0, 0))
+            opt_array.paste(imgs[1].resize((135, 135)), (W, 0))
+            opt_array.paste(imgs[2].resize((135, 135)), (W, 135))
+
+            # if UNI_W is None or UNI_H is None:
+            #     UNI_W, UNI_H = imgs[0].width, imgs[0].height
+
+            # ROWS = np.ceil(len(imgs) / COLS).astype(int)
+            # opt_array = Image.new(
+            #     'RGB', (
+            #         UNI_W*COLS+20*(COLS-1),
+            #         UNI_H*ROWS+20*(ROWS-1)
+            #     )
+            # )
+            # for i, img in enumerate(imgs):
+            #     if img.width > UNI_W or img.height > UNI_H:
+            #         img = img.resize((UNI_W, UNI_H))
+            #     if img.width < UNI_W or img.height < UNI_H:
+            #         tmp = Image.new('RGB', (UNI_W, UNI_H), (255, 255, 255))
+            #         tmp.paste(img, ((UNI_W-img.width)//2, (UNI_H-img.height)//2))
+            #         img = tmp
+            #     opt_array.paste(img, (
+            #         (i%COLS)*(UNI_W+20), (i//COLS)*(UNI_H+20)))
+            # opt_array = opt_array.resize(((opt_array.width+15)//16*16, (opt_array.height+15)//16*16))
             writer.append_data(np.array(opt_array))
     print(f'Video saved to {Path(save_path).absolute()}')
 
@@ -213,11 +221,11 @@ def main(task, name, config, seed, is_cache):
         next(data_list) # init
         print(f'Loaded {data_length} samples from {data_root}, structure:')
         gen_video(data_list, [
+            ['observation', 'head', 'rgb'],
             ['tactile', 'left_tactile', 'rgb_marker'],
             ['tactile', 'right_tactile', 'rgb_marker'],
-            ['observation', 'wrist', 'rgb'],
-            ['observation', 'head', 'rgb'],
-        ], f'{name}_{seed}.mp4', FPS=30, COLS=2)
+            # ['observation', 'wrist', 'rgb'],
+        ], f'{name}_{seed}.mp4', FPS=30, COLS=3)
     elif task == 'frame':
         print_frame(data_root, seed, frame=0)
 

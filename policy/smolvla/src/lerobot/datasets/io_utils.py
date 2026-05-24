@@ -16,14 +16,14 @@
 from pathlib import Path
 from typing import Any
 
-import lerobot.datasets as datasets
+import datasets
 import numpy as np
 import pandas
 import pandas as pd
 import pyarrow.dataset as pa_ds
 import pyarrow.parquet as pq
 import torch
-from lerobot.datasets import Dataset
+from datasets import Dataset
 from datasets.table import embed_table_storage
 from PIL import Image as PILImage
 from torchvision import transforms

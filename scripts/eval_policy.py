@@ -202,6 +202,11 @@ def main():
     policy_name = deploy_config['policy_name']
     deploy_config['task_name'] = task_file_name
     deploy_config['task_config'] = task_config_file.stem
+    import os
+    if os.environ.get('TRAIN_CONFIG'):
+        deploy_config['train_config_name'] = os.environ['TRAIN_CONFIG']
+    if os.environ.get('EP_NUM'):
+        deploy_config['expert_data_num'] = os.environ['EP_NUM']
  
     deploy_config['instuction_file'] = deploy_config.get('instuction_file', task_file_name)
     if deploy_config['instuction_file'] is not None:
@@ -236,10 +241,6 @@ def main():
     init_start = time.perf_counter()
     task:BaseTask = task_module.Task(env_cfg, mode='eval')
     task_init_cost = time.perf_counter() - init_start
-    
-    import os
-    if os.environ.get('TRAIN_CONFIG'):
-        deploy_config['train_config'] = os.environ['TRAIN_CONFIG']
     
     log_path = task.save_root / f"log.log"
     log(f"Task Name: {task_file_name}")

@@ -18,7 +18,7 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
-import lerobot.datasets as datasets
+import datasets
 import torch
 import torch.utils
 from huggingface_hub import HfApi, snapshot_download

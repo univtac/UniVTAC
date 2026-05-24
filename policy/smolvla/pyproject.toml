@@ -1,0 +1,163 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lerobot"
+version = "0.1.0"
+description = "LeRobot with SmolVLA visuo-tactile extensions"
+readme = { text = "LeRobot package vendored for UniVTAC SmolVLA experiments.", content-type = "text/plain" }
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [{ name = "Hugging Face LeRobot contributors and UniVTAC contributors" }]
+dependencies = [
+    "av",
+    "datasets",
+    "draccus",
+    "einops",
+    "fsspec",
+    "grpcio",
+    "gymnasium",
+    "h5py",
+    "huggingface-hub",
+    "jsonlines",
+    "matplotlib",
+    "numpy",
+    "opencv-python",
+    "packaging",
+    "pandas",
+    "pillow",
+    "protobuf",
+    "pyarrow",
+    "pydantic",
+    "pyyaml",
+    "requests",
+    "safetensors",
+    "scipy",
+    "termcolor",
+    "torch",
+    "torchvision",
+    "tqdm",
+    "transformers",
+    "typing-extensions",
+    "wandb",
+    "pyzmq",
+    "transforms3d>=0.4.2",
+]
+
+[project.optional-dependencies]
+dataset = [
+    "av",
+    "datasets",
+    "fsspec",
+    "h5py",
+    "huggingface-hub",
+    "jsonlines",
+    "matplotlib",
+    "numpy",
+    "opencv-python",
+    "pandas",
+    "pillow",
+    "pyarrow",
+    "safetensors",
+    "torch",
+    "torchvision",
+    "tqdm",
+]
+training = [
+    "accelerate",
+    "peft",
+    "sentencepiece",
+    "torch",
+    "torchvision",
+    "transformers",
+    "wandb",
+]
+hardware = [
+    "opencv-python",
+    "pyserial",
+    "pyzmq",
+]
+evaluation = [
+    "gymnasium",
+    "imageio",
+    "imageio-ffmpeg",
+]
+dev = [
+    "pytest",
+    "ruff",
+]
+all = [
+    "accelerate",
+    "av",
+    "datasets",
+    "fsspec",
+    "gymnasium",
+    "h5py",
+    "huggingface-hub",
+    "imageio",
+    "imageio-ffmpeg",
+    "jsonlines",
+    "matplotlib",
+    "numpy",
+    "opencv-python",
+    "pandas",
+    "peft",
+    "pillow",
+    "pyarrow",
+    "pyserial",
+    "pyzmq",
+    "safetensors",
+    "sentencepiece",
+    "torch",
+    "torchvision",
+    "tqdm",
+    "transformers",
+    "wandb",
+]
+
+[project.urls]
+Repository = "https://github.com/huggingface/lerobot"
+
+[project.scripts]
+lerobot-augment-dataset-quantile-stats = "lerobot.scripts.augment_dataset_quantile_stats:main"
+lerobot-calibrate = "lerobot.scripts.lerobot_calibrate:main"
+lerobot-dataset-viz = "lerobot.scripts.lerobot_dataset_viz:main"
+lerobot-edit-dataset = "lerobot.scripts.lerobot_edit_dataset:main"
+lerobot-eval = "lerobot.scripts.lerobot_eval:main"
+lerobot-find-cameras = "lerobot.scripts.lerobot_find_cameras:main"
+lerobot-find-joint-limits = "lerobot.scripts.lerobot_find_joint_limits:main"
+lerobot-find-port = "lerobot.scripts.lerobot_find_port:main"
+lerobot-imgtransform-viz = "lerobot.scripts.lerobot_imgtransform_viz:main"
+lerobot-info = "lerobot.scripts.lerobot_info:main"
+lerobot-record = "lerobot.scripts.lerobot_record:main"
+lerobot-replay = "lerobot.scripts.lerobot_replay:main"
+lerobot-rollout = "lerobot.scripts.lerobot_rollout:main"
+lerobot-setup-can = "lerobot.scripts.lerobot_setup_can:main"
+lerobot-setup-motors = "lerobot.scripts.lerobot_setup_motors:main"
+lerobot-teleoperate = "lerobot.scripts.lerobot_teleoperate:main"
+lerobot-train = "lerobot.scripts.lerobot_train:main"
+lerobot-train-tokenizer = "lerobot.scripts.lerobot_train_tokenizer:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["lerobot*"]
+
+[tool.setuptools.package-data]
+lerobot = [
+    "datasets/*.md",
+    "envs/*.json",
+    "templates/*.md",
+    "transport/*.proto",
+]
+
+[tool.uv.extra-build-dependencies]
+lerobot = ["setuptools>=69", "wheel"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"

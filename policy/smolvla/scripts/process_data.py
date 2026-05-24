@@ -201,11 +201,11 @@ class SmolVLADataPreprocessor(BaseDataPreprocessor):
 
     def visual_transform(self, images: np.ndarray) -> np.ndarray:
         resized = super().visual_transform(images)
-        return resized[..., ::-1].copy()
+        return resized
 
     def tactile_transform(self, images: np.ndarray) -> np.ndarray:
         resized = super().tactile_transform(images)
-        return resized[..., ::-1].copy()
+        return resized
 
     def _resolve_tactile_stream_keys(self, hdf5_path: Path) -> dict[str, dict[str, str]]:
         keys: dict[str, dict[str, str]] = {}

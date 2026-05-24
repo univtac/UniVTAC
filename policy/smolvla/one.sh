@@ -1,5 +1,7 @@
 set -euo pipefail
 
+POLICY_ROOT=$(cd "$(dirname "$0")" && pwd)
+
 # 检查最后一个参数是否为 -e
 last_arg="${@: -1}"
 skip_to_eval=false
@@ -15,7 +17,7 @@ gpu_id=${3}
 train_config=${4:-"auto"}
 expert_data_num=${5:-50}
 
-lerobot_data_home=${LEROBOT_DATA_HOME:-"$HOME/.cache/lerobot"}
+lerobot_data_home=${LEROBOT_DATA_HOME:-"$POLICY_ROOT/data"}
 repo_id=local/${task_name}-${task_config}-${expert_data_num}_vitac
 
 if [ "$train_config" = "auto" ]; then
@@ -29,14 +31,12 @@ if [ "$skip_to_eval" = false ]; then
     else
         echo "Processing data for $task_name..."
         python scripts/process_data.py \
-            --task-name $task_name \
-            --task-config $task_config \
-            --expert-data-num $expert_data_num \
+            $task_name $task_config $expert_data_num \
             --repo-id $repo_id
     fi
 
-    export TASK_NAME="${task_name}"
-    bash scripts/train.sh
+    # export TASK_NAME="${task_name}"
+    # bash scripts/train.sh
 fi
 
 # # 执行评估部分

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-import lerobot.datasets as datasets
+import datasets
 import pyarrow as pa
 
 LANGUAGE_PERSISTENT = "language_persistent"

@@ -29,7 +29,7 @@ from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-import lerobot.datasets as datasets
+import datasets
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq

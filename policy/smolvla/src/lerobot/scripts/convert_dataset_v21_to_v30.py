@@ -59,7 +59,7 @@ import jsonlines
 import pandas as pd
 import pyarrow as pa
 import tqdm
-from lerobot.datasets import Dataset, Features, Image
+from datasets import Dataset, Features, Image
 from huggingface_hub import HfApi, snapshot_download
 from requests import HTTPError
 

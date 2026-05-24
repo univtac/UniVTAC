@@ -16,7 +16,7 @@
 import logging
 from pprint import pformat
 
-import lerobot.datasets as datasets
+import datasets
 import numpy as np
 from PIL import Image as PILImage
 
