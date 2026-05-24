@@ -30,7 +30,7 @@ from gymnasium import spaces
 from libero.libero import benchmark, get_libero_path
 from libero.libero.envs import OffScreenRenderEnv
 
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotObservation
+from lerobot.types import RobotObservation
 
 from .utils import _LazyAsyncVectorEnv, parse_camera_names
 

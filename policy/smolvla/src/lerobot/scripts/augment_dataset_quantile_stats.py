@@ -44,7 +44,7 @@ from huggingface_hub import HfApi
 from requests import HTTPError
 from tqdm import tqdm
 
-from UniVTAC.policy.smolvla.src.lerobot.datasets import (
+from lerobot.datasets import (
     CODEBASE_VERSION,
     DEFAULT_QUANTILES,
     LeRobotDataset,
@@ -52,7 +52,7 @@ from UniVTAC.policy.smolvla.src.lerobot.datasets import (
     get_feature_stats,
     write_stats,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import init_logging
+from lerobot.utils.utils import init_logging
 
 
 def has_quantile_stats(stats: dict[str, dict] | None, quantile_list_keys: list[str] | None = None) -> bool:

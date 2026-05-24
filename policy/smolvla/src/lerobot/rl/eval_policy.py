@@ -15,16 +15,16 @@
 # limitations under the License.
 import logging
 
-from UniVTAC.policy.smolvla.src.lerobot.cameras import opencv  # noqa: F401
-from UniVTAC.policy.smolvla.src.lerobot.configs import parser
-from UniVTAC.policy.smolvla.src.lerobot.datasets import LeRobotDataset
-from UniVTAC.policy.smolvla.src.lerobot.policies import make_policy
-from UniVTAC.policy.smolvla.src.lerobot.robots import RobotConfig, make_robot_from_config
-from UniVTAC.policy.smolvla.src.lerobot.robots import (  # noqa: F401
+from lerobot.cameras import opencv  # noqa: F401
+from lerobot.configs import parser
+from lerobot.datasets import LeRobotDataset
+from lerobot.policies import make_policy
+from lerobot.robots import RobotConfig, make_robot_from_config
+from lerobot.robots import (  # noqa: F401
     so_follower,
 )
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators import gamepad
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators import (
+from lerobot.teleoperators import gamepad
+from lerobot.teleoperators import (
     so_leader,  # noqa: F401
 )
 

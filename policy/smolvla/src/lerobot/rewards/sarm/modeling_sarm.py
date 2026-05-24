@@ -32,7 +32,7 @@ import torch.nn as nn
 import torch.nn.functional as F  # noqa: N812
 from torch import Tensor
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import OBS_STR
+from lerobot.utils.constants import OBS_STR
 
 from ..pretrained import PreTrainedRewardModel
 from .configuration_sarm import SARMConfig

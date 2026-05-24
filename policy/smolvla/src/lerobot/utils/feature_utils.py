@@ -25,7 +25,7 @@ from typing import Any
 
 import numpy as np
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, PolicyFeature
+from lerobot.configs import FeatureType, PolicyFeature
 
 from .constants import ACTION, DEFAULT_FEATURES, OBS_ENV_STATE, OBS_STR
 

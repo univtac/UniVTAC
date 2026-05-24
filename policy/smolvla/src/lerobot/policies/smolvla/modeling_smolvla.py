@@ -60,9 +60,9 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 from torch import Tensor, nn
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import ACTION, OBS_LANGUAGE_ATTENTION_MASK, OBS_LANGUAGE_TOKENS, OBS_STATE
-from UniVTAC.policy.smolvla.src.lerobot.utils.device_utils import get_safe_dtype
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import require_package
+from lerobot.utils.constants import ACTION, OBS_LANGUAGE_ATTENTION_MASK, OBS_LANGUAGE_TOKENS, OBS_STATE
+from lerobot.utils.device_utils import get_safe_dtype
+from lerobot.utils.import_utils import require_package
 
 from ..pretrained import PreTrainedPolicy
 from ..rtc.modeling_rtc import RTCProcessor

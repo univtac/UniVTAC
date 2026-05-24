@@ -17,12 +17,12 @@ from collections import deque
 from collections.abc import Callable, Generator, Iterable, Iterator
 from pathlib import Path
 
-import UniVTAC.policy.smolvla.src.lerobot.datasets as datasets
+import lerobot.datasets as datasets
 import numpy as np
 import torch
-from UniVTAC.policy.smolvla.src.lerobot.datasets import load_dataset
+from lerobot.datasets import load_dataset
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import HF_LEROBOT_HOME, LOOKAHEAD_BACKTRACKTABLE, LOOKBACK_BACKTRACKTABLE
+from lerobot.utils.constants import HF_LEROBOT_HOME, LOOKAHEAD_BACKTRACKTABLE, LOOKBACK_BACKTRACKTABLE
 
 from .dataset_metadata import CODEBASE_VERSION, LeRobotDatasetMetadata
 from .feature_utils import get_delta_indices

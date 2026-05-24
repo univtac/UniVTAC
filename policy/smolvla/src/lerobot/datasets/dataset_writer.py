@@ -24,14 +24,14 @@ import shutil
 import tempfile
 from pathlib import Path
 
-import UniVTAC.policy.smolvla.src.lerobot.datasets as datasets
+import lerobot.datasets as datasets
 import numpy as np
 import pandas as pd
 import PIL.Image
 import pyarrow.parquet as pq
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import VideoEncoderConfig, camera_encoder_defaults
+from lerobot.configs import VideoEncoderConfig, camera_encoder_defaults
 
 from .compute_stats import compute_episode_stats
 from .dataset_metadata import LeRobotDatasetMetadata

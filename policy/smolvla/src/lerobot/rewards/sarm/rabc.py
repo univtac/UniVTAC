@@ -36,8 +36,8 @@ import numpy as np
 import torch
 from huggingface_hub import hf_hub_download
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _pandas_available
-from UniVTAC.policy.smolvla.src.lerobot.utils.sample_weighting import SampleWeighter
+from lerobot.utils.import_utils import _pandas_available
+from lerobot.utils.sample_weighting import SampleWeighter
 
 if TYPE_CHECKING or _pandas_available:
     import pandas as pd

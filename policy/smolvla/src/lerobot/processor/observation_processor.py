@@ -20,8 +20,8 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import OBS_ENV_STATE, OBS_IMAGE, OBS_IMAGES, OBS_STATE, OBS_STR
+from lerobot.configs import PipelineFeatureType, PolicyFeature
+from lerobot.utils.constants import OBS_ENV_STATE, OBS_IMAGE, OBS_IMAGES, OBS_STATE, OBS_STR
 
 from .pipeline import ObservationProcessorStep, ProcessorStepRegistry
 

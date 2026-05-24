@@ -27,9 +27,9 @@ import torch
 from huggingface_hub import hf_hub_download, snapshot_download
 from torch import Tensor
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import OBS_ENV_STATE, OBS_IMAGE, OBS_IMAGES, OBS_STATE, OBS_STR
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import get_channel_first_image_shape
+from lerobot.configs import FeatureType, PolicyFeature
+from lerobot.utils.constants import OBS_ENV_STATE, OBS_IMAGE, OBS_IMAGES, OBS_STATE, OBS_STR
+from lerobot.utils.utils import get_channel_first_image_shape
 
 from .configs import EnvConfig
 

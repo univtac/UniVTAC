@@ -56,16 +56,16 @@ from typing import Any
 
 import numpy as np
 
-from UniVTAC.policy.smolvla.src.lerobot.common.control_utils import is_headless
-from UniVTAC.policy.smolvla.src.lerobot.datasets import VideoEncodingManager
-from UniVTAC.policy.smolvla.src.lerobot.datasets.utils import DEFAULT_VIDEO_FILE_SIZE_IN_MB
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators import Teleoperator
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import ACTION, OBS_STR
-from UniVTAC.policy.smolvla.src.lerobot.utils.feature_utils import build_dataset_frame
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _pynput_available
-from UniVTAC.policy.smolvla.src.lerobot.utils.pedal import start_pedal_listener
-from UniVTAC.policy.smolvla.src.lerobot.utils.robot_utils import precise_sleep
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import log_say
+from lerobot.common.control_utils import is_headless
+from lerobot.datasets import VideoEncodingManager
+from lerobot.datasets.utils import DEFAULT_VIDEO_FILE_SIZE_IN_MB
+from lerobot.teleoperators import Teleoperator
+from lerobot.utils.constants import ACTION, OBS_STR
+from lerobot.utils.feature_utils import build_dataset_frame
+from lerobot.utils.import_utils import _pynput_available
+from lerobot.utils.pedal import start_pedal_listener
+from lerobot.utils.robot_utils import precise_sleep
+from lerobot.utils.utils import log_say
 
 from ..configs import DAggerKeyboardConfig, DAggerPedalConfig, DAggerStrategyConfig
 from ..context import RolloutContext

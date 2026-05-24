@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotAction, RobotObservation
+from lerobot.types import RobotAction, RobotObservation
 
 from .converters import (
     observation_to_transition,

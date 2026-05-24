@@ -20,7 +20,7 @@ from typing import Any
 
 from torch.utils.data._utils.collate import default_collate
 
-from UniVTAC.policy.smolvla.src.lerobot.datasets.language import LANGUAGE_COLUMNS
+from lerobot.datasets.language import LANGUAGE_COLUMNS
 
 _PYTHON_LIST_KEYS = {"messages", "message_streams", "target_message_indices"}
 

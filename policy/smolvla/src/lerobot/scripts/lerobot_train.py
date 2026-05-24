@@ -33,26 +33,26 @@ from termcolor import colored
 from torch.optim import Optimizer
 from tqdm import tqdm
 
-from UniVTAC.policy.smolvla.src.lerobot.common.train_utils import (
+from lerobot.common.train_utils import (
     get_step_checkpoint_dir,
     get_step_identifier,
     load_training_state,
     save_checkpoint,
     update_last_checkpoint,
 )
-from UniVTAC.policy.smolvla.src.lerobot.common.wandb_utils import WandBLogger
-from UniVTAC.policy.smolvla.src.lerobot.configs import parser
-from UniVTAC.policy.smolvla.src.lerobot.configs.train import TrainPipelineConfig
-from UniVTAC.policy.smolvla.src.lerobot.datasets import EpisodeAwareSampler, make_dataset
-from UniVTAC.policy.smolvla.src.lerobot.envs import close_envs, make_env, make_env_pre_post_processors
-from UniVTAC.policy.smolvla.src.lerobot.optim.factory import make_optimizer_and_scheduler
-from UniVTAC.policy.smolvla.src.lerobot.policies import PreTrainedPolicy, make_policy, make_pre_post_processors
-from UniVTAC.policy.smolvla.src.lerobot.rewards import make_reward_pre_post_processors
-from UniVTAC.policy.smolvla.src.lerobot.utils.collate import lerobot_collate_fn
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import register_third_party_plugins
-from UniVTAC.policy.smolvla.src.lerobot.utils.logging_utils import AverageMeter, MetricsTracker
-from UniVTAC.policy.smolvla.src.lerobot.utils.random_utils import set_seed
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import (
+from lerobot.common.wandb_utils import WandBLogger
+from lerobot.configs import parser
+from lerobot.configs.train import TrainPipelineConfig
+from lerobot.datasets import EpisodeAwareSampler, make_dataset
+from lerobot.envs import close_envs, make_env, make_env_pre_post_processors
+from lerobot.optim.factory import make_optimizer_and_scheduler
+from lerobot.policies import PreTrainedPolicy, make_policy, make_pre_post_processors
+from lerobot.rewards import make_reward_pre_post_processors
+from lerobot.utils.collate import lerobot_collate_fn
+from lerobot.utils.import_utils import register_third_party_plugins
+from lerobot.utils.logging_utils import AverageMeter, MetricsTracker
+from lerobot.utils.random_utils import set_seed
+from lerobot.utils.utils import (
     cycle,
     format_big_number,
     has_method,
@@ -178,7 +178,7 @@ def train(cfg: TrainPipelineConfig, accelerator: "Accelerator | None" = None):
         cfg: A `TrainPipelineConfig` object containing all training configurations.
         accelerator: Optional Accelerator instance. If None, one will be created automatically.
     """
-    from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import require_package
+    from lerobot.utils.import_utils import require_package
 
     require_package("accelerate", extra="training")
     from accelerate import Accelerator
@@ -254,7 +254,7 @@ def train(cfg: TrainPipelineConfig, accelerator: "Accelerator | None" = None):
     if cfg.is_reward_model_training:
         if is_main_process:
             logging.info("Creating reward model")
-        from UniVTAC.policy.smolvla.src.lerobot.rewards import make_reward_model
+        from lerobot.rewards import make_reward_model
 
         policy = make_reward_model(
             cfg=cfg.reward_model,
@@ -351,7 +351,7 @@ def train(cfg: TrainPipelineConfig, accelerator: "Accelerator | None" = None):
     # Create sample weighter if configured (e.g., for RA-BC training)
     sample_weighter = None
     if cfg.sample_weighting is not None:
-        from UniVTAC.policy.smolvla.src.lerobot.utils.sample_weighting import make_sample_weighter
+        from lerobot.utils.sample_weighting import make_sample_weighter
 
         if is_main_process:
             logging.info(f"Creating sample weighter: {cfg.sample_weighting.type}")

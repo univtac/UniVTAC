@@ -20,10 +20,10 @@ Paper: https://arxiv.org/abs/2509.25358
 
 from dataclasses import dataclass, field
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, NormalizationMode, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.configs.rewards import RewardModelConfig
-from UniVTAC.policy.smolvla.src.lerobot.optim import AdamWConfig, CosineDecayWithWarmupSchedulerConfig
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import OBS_IMAGES, OBS_STATE
+from lerobot.configs import FeatureType, NormalizationMode, PolicyFeature
+from lerobot.configs.rewards import RewardModelConfig
+from lerobot.optim import AdamWConfig, CosineDecayWithWarmupSchedulerConfig
+from lerobot.utils.constants import OBS_IMAGES, OBS_STATE
 
 
 @RewardModelConfig.register_subclass("sarm")

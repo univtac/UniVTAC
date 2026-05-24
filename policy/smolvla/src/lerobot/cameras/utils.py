@@ -16,7 +16,7 @@
 
 from typing import cast
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import make_device_from_device_class
+from lerobot.utils.import_utils import make_device_from_device_class
 
 from .camera import Camera
 from .configs import CameraConfig, Cv2Rotation

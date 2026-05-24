@@ -23,11 +23,11 @@ from typing import TYPE_CHECKING, Any, TypedDict, Unpack
 import torch
 
 if TYPE_CHECKING:
-    from UniVTAC.policy.smolvla.src.lerobot.datasets import LeRobotDatasetMetadata
+    from lerobot.datasets import LeRobotDatasetMetadata
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, PreTrainedConfig
-from UniVTAC.policy.smolvla.src.lerobot.envs import EnvConfig, env_to_policy_features
-from UniVTAC.policy.smolvla.src.lerobot.processor import (
+from lerobot.configs import FeatureType, PreTrainedConfig
+from lerobot.envs import EnvConfig, env_to_policy_features
+from lerobot.processor import (
     AbsoluteActionsProcessorStep,
     PolicyProcessorPipeline,
     RelativeActionsProcessorStep,
@@ -36,13 +36,13 @@ from UniVTAC.policy.smolvla.src.lerobot.processor import (
     transition_to_batch,
     transition_to_policy_action,
 )
-from UniVTAC.policy.smolvla.src.lerobot.types import PolicyAction
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import (
+from lerobot.types import PolicyAction
+from lerobot.utils.constants import (
     ACTION,
     POLICY_POSTPROCESSOR_DEFAULT_NAME,
     POLICY_PREPROCESSOR_DEFAULT_NAME,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.feature_utils import dataset_to_policy_features
+from lerobot.utils.feature_utils import dataset_to_policy_features
 
 from .act.configuration_act import ACTConfig
 from .diffusion.configuration_diffusion import DiffusionConfig

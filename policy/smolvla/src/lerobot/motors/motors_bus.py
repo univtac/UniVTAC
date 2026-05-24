@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from tqdm import tqdm
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _deepdiff_available, _serial_available, require_package
+from lerobot.utils.import_utils import _deepdiff_available, _serial_available, require_package
 
 if TYPE_CHECKING or _serial_available:
     import serial
@@ -45,8 +45,8 @@ if TYPE_CHECKING or _deepdiff_available:
 else:
     DeepDiff = None  # type: ignore[assignment, misc]
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import enter_pressed, move_cursor_up
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.utils.utils import enter_pressed, move_cursor_up
 
 type NameOrID = str | int
 type Value = int | float

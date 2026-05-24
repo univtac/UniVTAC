@@ -14,7 +14,7 @@
 
 from dataclasses import dataclass, field
 
-from UniVTAC.policy.smolvla.src.lerobot.cameras import CameraConfig
+from lerobot.cameras import CameraConfig
 
 from ..config import RobotConfig
 

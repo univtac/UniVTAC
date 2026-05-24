@@ -19,8 +19,8 @@ import logging
 
 import numpy as np
 
-from UniVTAC.policy.smolvla.src.lerobot.processor import RelativeActionsProcessorStep
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import ACTION, OBS_STATE
+from lerobot.processor import RelativeActionsProcessorStep
+from lerobot.utils.constants import ACTION, OBS_STATE
 
 from .io_utils import load_image_as_numpy
 

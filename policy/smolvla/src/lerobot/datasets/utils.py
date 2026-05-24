@@ -21,14 +21,14 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import UniVTAC.policy.smolvla.src.lerobot.datasets as datasets
+import lerobot.datasets as datasets
 import numpy as np
 import packaging.version
 import torch
 from huggingface_hub import DatasetCard, DatasetCardData, HfApi
 from huggingface_hub.errors import RevisionNotFoundError
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import flatten_dict, unflatten_dict
+from lerobot.utils.utils import flatten_dict, unflatten_dict
 
 V30_MESSAGE = """
 The dataset you requested ({repo_id}) is in {version} format.

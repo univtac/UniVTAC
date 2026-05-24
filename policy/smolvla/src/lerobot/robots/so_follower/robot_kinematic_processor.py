@@ -19,9 +19,9 @@ from typing import Any
 
 import numpy as np
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.model import RobotKinematics
-from UniVTAC.policy.smolvla.src.lerobot.processor import (
+from lerobot.configs import FeatureType, PipelineFeatureType, PolicyFeature
+from lerobot.model import RobotKinematics
+from lerobot.processor import (
     EnvTransition,
     ObservationProcessorStep,
     ProcessorStep,
@@ -31,7 +31,7 @@ from UniVTAC.policy.smolvla.src.lerobot.processor import (
     RobotObservation,
     TransitionKey,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.rotation import Rotation
+from lerobot.utils.rotation import Rotation
 
 
 @ProcessorStepRegistry.register("ee_reference_and_delta")

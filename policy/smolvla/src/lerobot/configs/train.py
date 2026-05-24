@@ -24,10 +24,10 @@ import draccus
 from huggingface_hub import hf_hub_download
 from huggingface_hub.errors import HfHubHTTPError
 
-from UniVTAC.policy.smolvla.src.lerobot import envs
-from UniVTAC.policy.smolvla.src.lerobot.optim import LRSchedulerConfig, OptimizerConfig
-from UniVTAC.policy.smolvla.src.lerobot.utils.hub import HubMixin
-from UniVTAC.policy.smolvla.src.lerobot.utils.sample_weighting import SampleWeightingConfig
+from lerobot import envs
+from lerobot.optim import LRSchedulerConfig, OptimizerConfig
+from lerobot.utils.hub import HubMixin
+from lerobot.utils.sample_weighting import SampleWeightingConfig
 
 from . import parser
 from .default import DatasetConfig, EvalConfig, PeftConfig, WandBConfig

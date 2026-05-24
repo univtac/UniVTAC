@@ -24,8 +24,8 @@ import torch
 import torchvision.transforms.functional as F  # type: ignore  # noqa: N812
 from tqdm import tqdm  # type: ignore
 
-from UniVTAC.policy.smolvla.src.lerobot.datasets import LeRobotDataset
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import DONE, REWARD
+from lerobot.datasets import LeRobotDataset
+from lerobot.utils.constants import DONE, REWARD
 
 
 def select_rect_roi(img):

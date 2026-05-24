@@ -19,9 +19,9 @@ import time
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from UniVTAC.policy.smolvla.src.lerobot.robots.unitree_g1.g1_utils import REMOTE_AXES, G1_29_JointArmIndex
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import HF_LEROBOT_CALIBRATION, TELEOPERATORS
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _unitree_sdk_available
+from lerobot.robots.unitree_g1.g1_utils import REMOTE_AXES, G1_29_JointArmIndex
+from lerobot.utils.constants import HF_LEROBOT_CALIBRATION, TELEOPERATORS
+from lerobot.utils.import_utils import _unitree_sdk_available
 
 if TYPE_CHECKING or _unitree_sdk_available:
     from unitree_sdk2py.utils.joystick import Joystick

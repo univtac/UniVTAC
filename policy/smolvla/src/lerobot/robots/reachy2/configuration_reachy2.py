@@ -14,8 +14,8 @@
 
 from dataclasses import dataclass, field
 
-from UniVTAC.policy.smolvla.src.lerobot.cameras import CameraConfig, ColorMode
-from UniVTAC.policy.smolvla.src.lerobot.cameras.reachy2_camera import Reachy2CameraConfig
+from lerobot.cameras import CameraConfig, ColorMode
+from lerobot.cameras.reachy2_camera import Reachy2CameraConfig
 
 from ..config import RobotConfig
 

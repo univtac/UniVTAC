@@ -49,21 +49,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import NormalizationMode
+from lerobot.configs import NormalizationMode
 import numpy as np
 import torch
 from huggingface_hub import HfApi
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _transformers_available
+from lerobot.utils.import_utils import _transformers_available
 
 if TYPE_CHECKING or _transformers_available:
     from transformers import AutoProcessor
 else:
     AutoProcessor = None
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import parser
-from UniVTAC.policy.smolvla.src.lerobot.datasets import LeRobotDataset
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import ACTION, OBS_STATE
+from lerobot.configs import parser
+from lerobot.datasets import LeRobotDataset
+from lerobot.utils.constants import ACTION, OBS_STATE
 
 
 @dataclass

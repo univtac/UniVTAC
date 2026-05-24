@@ -32,8 +32,8 @@ if platform.system() == "Windows" and "OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"
 import cv2  # type: ignore  # TODO: add type stubs for OpenCV
 import numpy as np  # type: ignore  # TODO: add type stubs for numpy
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_not_connected
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _reachy2_sdk_available, require_package
+from lerobot.utils.decorators import check_if_not_connected
+from lerobot.utils.import_utils import _reachy2_sdk_available, require_package
 
 if TYPE_CHECKING or _reachy2_sdk_available:
     from reachy2_sdk.media.camera import CameraView
@@ -46,7 +46,7 @@ else:
         RIGHT = 1
 
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.errors import DeviceNotConnectedError
+from lerobot.utils.errors import DeviceNotConnectedError
 
 from ..camera import Camera
 from .configuration_reachy2_camera import ColorMode, Reachy2CameraConfig

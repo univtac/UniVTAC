@@ -32,8 +32,8 @@ if platform.system() == "Windows" and "OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"
     os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
 import cv2  # type: ignore  # TODO: add type stubs for OpenCV
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
-from UniVTAC.policy.smolvla.src.lerobot.utils.errors import DeviceNotConnectedError
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.utils.errors import DeviceNotConnectedError
 
 from ..camera import Camera
 from ..utils import get_cv2_rotation

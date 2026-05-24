@@ -57,9 +57,9 @@ import torch
 from huggingface_hub import HfApi, hf_hub_download
 from safetensors.torch import load_file as load_safetensors
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, NormalizationMode, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.policies import get_policy_class, make_policy_config, make_pre_post_processors
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import ACTION
+from lerobot.configs import FeatureType, NormalizationMode, PolicyFeature
+from lerobot.policies import get_policy_class, make_policy_config, make_pre_post_processors
+from lerobot.utils.constants import ACTION
 
 
 def extract_normalization_stats(state_dict: dict[str, torch.Tensor]) -> dict[str, dict[str, torch.Tensor]]:

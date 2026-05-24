@@ -23,8 +23,8 @@ from copy import deepcopy
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, TypedDict
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _can_available, require_package
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.utils.import_utils import _can_available, require_package
 
 if TYPE_CHECKING or _can_available:
     import can
@@ -37,8 +37,8 @@ else:
 
 import numpy as np
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.robot_utils import precise_sleep
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import enter_pressed, move_cursor_up
+from lerobot.utils.robot_utils import precise_sleep
+from lerobot.utils.utils import enter_pressed, move_cursor_up
 
 from ..motors_bus import Motor, MotorCalibration, MotorsBusBase, NameOrID, Value
 from .tables import (

@@ -20,11 +20,11 @@ import logging
 import shutil
 from pathlib import Path
 
-import UniVTAC.policy.smolvla.src.lerobot.datasets as datasets
+import lerobot.datasets as datasets
 import pandas as pd
 import tqdm
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import VIDEO_ENCODER_INFO_KEYS
+from lerobot.configs import VIDEO_ENCODER_INFO_KEYS
 
 from .compute_stats import aggregate_stats
 from .dataset_metadata import LeRobotDatasetMetadata

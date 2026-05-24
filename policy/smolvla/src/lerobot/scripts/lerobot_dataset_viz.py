@@ -72,9 +72,9 @@ import torch
 import torch.utils.data
 import tqdm
 
-from UniVTAC.policy.smolvla.src.lerobot.datasets import LeRobotDataset
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import ACTION, DONE, OBS_STATE, REWARD
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import init_logging
+from lerobot.datasets import LeRobotDataset
+from lerobot.utils.constants import ACTION, DONE, OBS_STATE, REWARD
+from lerobot.utils.utils import init_logging
 
 
 def to_hwc_uint8_numpy(chw_float32_torch: torch.Tensor) -> np.ndarray:
@@ -118,7 +118,7 @@ def visualize_dataset(
     if mode not in ["local", "distant"]:
         raise ValueError(mode)
 
-    from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import require_package
+    from lerobot.utils.import_utils import require_package
 
     require_package("rerun-sdk", extra="viz", import_name="rerun")
     import rerun as rr

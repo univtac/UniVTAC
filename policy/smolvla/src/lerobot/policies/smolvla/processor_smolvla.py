@@ -18,7 +18,7 @@ from typing import Any
 
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.processor import (
+from lerobot.processor import (
     AddBatchDimensionProcessorStep,
     DeviceProcessorStep,
     NewLineTaskProcessorStep,
@@ -31,7 +31,7 @@ from UniVTAC.policy.smolvla.src.lerobot.processor import (
     policy_action_to_transition,
     transition_to_policy_action,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import POLICY_POSTPROCESSOR_DEFAULT_NAME, POLICY_PREPROCESSOR_DEFAULT_NAME
+from lerobot.utils.constants import POLICY_POSTPROCESSOR_DEFAULT_NAME, POLICY_PREPROCESSOR_DEFAULT_NAME
 
 from .configuration_smolvla import SmolVLAConfig
 

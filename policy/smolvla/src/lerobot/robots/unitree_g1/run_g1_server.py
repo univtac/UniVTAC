@@ -39,7 +39,7 @@ from unitree_sdk2py.idl.default import unitree_hg_msg_dds__LowCmd_
 from unitree_sdk2py.idl.unitree_hg.msg.dds_ import LowCmd_ as hg_LowCmd, LowState_ as hg_LowState
 from unitree_sdk2py.utils.crc import CRC
 
-from UniVTAC.policy.smolvla.src.lerobot.cameras.zmq.image_server import ImageServer
+from lerobot.cameras.zmq.image_server import ImageServer
 
 # DDS topic names follow Unitree SDK naming conventions
 # ruff: noqa: N816

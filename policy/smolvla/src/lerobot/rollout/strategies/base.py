@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import time
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.robot_utils import precise_sleep
+from lerobot.utils.robot_utils import precise_sleep
 
 from ..context import RolloutContext
 from .core import RolloutStrategy, send_next_action

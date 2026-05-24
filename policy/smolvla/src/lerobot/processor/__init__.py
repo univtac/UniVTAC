@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from UniVTAC.policy.smolvla.src.lerobot.types import (
+from lerobot.types import (
     EnvAction,
     EnvTransition,
     PolicyAction,

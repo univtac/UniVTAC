@@ -45,7 +45,7 @@ from dataclasses import dataclass, field
 
 import draccus
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _can_available
+from lerobot.utils.import_utils import _can_available
 
 MOTOR_NAMES = {
     0x01: "joint_1",

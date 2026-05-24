@@ -24,9 +24,9 @@ import draccus
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LambdaLR, LRScheduler
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import SCHEDULER_STATE
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _diffusers_available, require_package
-from UniVTAC.policy.smolvla.src.lerobot.utils.io_utils import deserialize_json_into_object, write_json
+from lerobot.utils.constants import SCHEDULER_STATE
+from lerobot.utils.import_utils import _diffusers_available, require_package
+from lerobot.utils.io_utils import deserialize_json_into_object, write_json
 
 if TYPE_CHECKING or _diffusers_available:
     from diffusers.optimization import get_scheduler

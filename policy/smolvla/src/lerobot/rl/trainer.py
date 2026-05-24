@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
-from UniVTAC.policy.smolvla.src.lerobot.types import BatchType
+from lerobot.types import BatchType
 
 from .algorithms.base import RLAlgorithm
 from .algorithms.configs import TrainingStats

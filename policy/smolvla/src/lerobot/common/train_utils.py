@@ -18,24 +18,24 @@ from pathlib import Path
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
-from UniVTAC.policy.smolvla.src.lerobot.configs.train import TrainPipelineConfig
-from UniVTAC.policy.smolvla.src.lerobot.optim import (
+from lerobot.configs.train import TrainPipelineConfig
+from lerobot.optim import (
     load_optimizer_state,
     load_scheduler_state,
     save_optimizer_state,
     save_scheduler_state,
 )
-from UniVTAC.policy.smolvla.src.lerobot.policies import PreTrainedPolicy
-from UniVTAC.policy.smolvla.src.lerobot.processor import PolicyProcessorPipeline
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import (
+from lerobot.policies import PreTrainedPolicy
+from lerobot.processor import PolicyProcessorPipeline
+from lerobot.utils.constants import (
     CHECKPOINTS_DIR,
     LAST_CHECKPOINT_LINK,
     PRETRAINED_MODEL_DIR,
     TRAINING_STATE_DIR,
     TRAINING_STEP,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.io_utils import load_json, write_json
-from UniVTAC.policy.smolvla.src.lerobot.utils.random_utils import load_rng_state, save_rng_state
+from lerobot.utils.io_utils import load_json, write_json
+from lerobot.utils.random_utils import load_rng_state, save_rng_state
 
 
 def get_step_identifier(step: int, total_steps: int) -> str:

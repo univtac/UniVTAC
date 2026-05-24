@@ -19,12 +19,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.configs.recipe import TrainingRecipe
-from UniVTAC.policy.smolvla.src.lerobot.datasets.language import LANGUAGE_EVENTS, LANGUAGE_PERSISTENT
-from UniVTAC.policy.smolvla.src.lerobot.datasets.language_render import render_sample
-from UniVTAC.policy.smolvla.src.lerobot.types import EnvTransition, TransitionKey
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import unwrap_scalar
+from lerobot.configs import PipelineFeatureType, PolicyFeature
+from lerobot.configs.recipe import TrainingRecipe
+from lerobot.datasets.language import LANGUAGE_EVENTS, LANGUAGE_PERSISTENT
+from lerobot.datasets.language_render import render_sample
+from lerobot.types import EnvTransition, TransitionKey
+from lerobot.utils.utils import unwrap_scalar
 
 from .pipeline import ProcessorStep, ProcessorStepRegistry
 

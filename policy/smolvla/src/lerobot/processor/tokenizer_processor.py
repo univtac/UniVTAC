@@ -29,9 +29,9 @@ from typing import TYPE_CHECKING, Any
 
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.types import EnvTransition, RobotObservation, TransitionKey
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import (
+from lerobot.configs import FeatureType, PipelineFeatureType, PolicyFeature
+from lerobot.types import EnvTransition, RobotObservation, TransitionKey
+from lerobot.utils.constants import (
     ACTION_TOKEN_MASK,
     ACTION_TOKENS,
     OBS_LANGUAGE_ATTENTION_MASK,
@@ -39,7 +39,7 @@ from UniVTAC.policy.smolvla.src.lerobot.utils.constants import (
     OBS_LANGUAGE_SUBTASK_TOKENS,
     OBS_LANGUAGE_TOKENS,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _transformers_available
+from lerobot.utils.import_utils import _transformers_available
 
 from .pipeline import ActionProcessorStep, ObservationProcessorStep, ProcessorStepRegistry
 

@@ -22,7 +22,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import require_package
+from lerobot.utils.import_utils import require_package
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ class VideoEncoderConfig:
         """
         if self.video_backend == "pyav":
             require_package("av", extra="dataset")
-            from UniVTAC.policy.smolvla.src.lerobot.datasets import detect_available_encoders_pyav
+            from lerobot.datasets import detect_available_encoders_pyav
 
             return detect_available_encoders_pyav(encoders)
         return []
@@ -136,7 +136,7 @@ class VideoEncoderConfig:
         """Validate the video encoder configuration."""
         if self.video_backend == "pyav":
             require_package("av", extra="dataset")
-            from UniVTAC.policy.smolvla.src.lerobot.datasets import check_video_encoder_parameters_pyav
+            from lerobot.datasets import check_video_encoder_parameters_pyav
 
             check_video_encoder_parameters_pyav(self.vcodec, self.pix_fmt, self.get_codec_options())
 

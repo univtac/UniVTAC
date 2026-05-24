@@ -26,10 +26,10 @@ from huggingface_hub import hf_hub_download
 from huggingface_hub.constants import CONFIG_NAME
 from huggingface_hub.errors import HfHubHTTPError
 
-from UniVTAC.policy.smolvla.src.lerobot.optim import LRSchedulerConfig, OptimizerConfig
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import ACTION, OBS_STATE
-from UniVTAC.policy.smolvla.src.lerobot.utils.device_utils import auto_select_torch_device, is_amp_available, is_torch_device_available
-from UniVTAC.policy.smolvla.src.lerobot.utils.hub import HubMixin
+from lerobot.optim import LRSchedulerConfig, OptimizerConfig
+from lerobot.utils.constants import ACTION, OBS_STATE
+from lerobot.utils.device_utils import auto_select_torch_device, is_amp_available, is_torch_device_available
+from lerobot.utils.hub import HubMixin
 
 from .types import FeatureType, PolicyFeature
 

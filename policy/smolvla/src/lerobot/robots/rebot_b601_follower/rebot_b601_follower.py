@@ -20,11 +20,11 @@ import time
 from functools import cached_property
 from typing import TYPE_CHECKING
 
-from UniVTAC.policy.smolvla.src.lerobot.cameras import make_cameras_from_configs
-from UniVTAC.policy.smolvla.src.lerobot.motors import MotorCalibration
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotAction, RobotObservation
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _motorbridge_available, require_package
+from lerobot.cameras import make_cameras_from_configs
+from lerobot.motors import MotorCalibration
+from lerobot.types import RobotAction, RobotObservation
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.utils.import_utils import _motorbridge_available, require_package
 
 from ..robot import Robot
 from ..utils import ensure_safe_goal_position

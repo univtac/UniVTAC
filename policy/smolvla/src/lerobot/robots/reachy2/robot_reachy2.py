@@ -18,9 +18,9 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
-from UniVTAC.policy.smolvla.src.lerobot.cameras import make_cameras_from_configs
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotAction, RobotObservation
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _reachy2_sdk_available, require_package
+from lerobot.cameras import make_cameras_from_configs
+from lerobot.types import RobotAction, RobotObservation
+from lerobot.utils.import_utils import _reachy2_sdk_available, require_package
 
 from ..robot import Robot
 from ..utils import ensure_safe_goal_position

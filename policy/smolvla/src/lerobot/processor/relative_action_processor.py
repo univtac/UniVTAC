@@ -19,9 +19,9 @@ from typing import Any
 import torch
 from torch import Tensor
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.types import EnvTransition, TransitionKey
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import OBS_STATE
+from lerobot.configs import PipelineFeatureType, PolicyFeature
+from lerobot.types import EnvTransition, TransitionKey
+from lerobot.utils.constants import OBS_STATE
 
 from .delta_action_processor import MapDeltaActionToRobotActionStep, MapTensorToDeltaActionDictStep
 from .pipeline import ProcessorStep, ProcessorStepRegistry

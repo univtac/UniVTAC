@@ -57,7 +57,7 @@ import pyarrow.parquet as pq
 import torch
 from tqdm import tqdm
 
-from UniVTAC.policy.smolvla.src.lerobot.datasets import LeRobotDataset
+from lerobot.datasets import LeRobotDataset
 
 from .modeling_sarm import SARMRewardModel
 from .processor_sarm import make_sarm_pre_post_processors

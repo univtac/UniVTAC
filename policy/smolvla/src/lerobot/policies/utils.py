@@ -21,10 +21,10 @@ import numpy as np
 import torch
 from torch import nn
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, PolicyFeature, PreTrainedConfig
-from UniVTAC.policy.smolvla.src.lerobot.types import PolicyAction, RobotAction, RobotObservation
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import ACTION, OBS_STR
-from UniVTAC.policy.smolvla.src.lerobot.utils.feature_utils import build_dataset_frame
+from lerobot.configs import FeatureType, PolicyFeature, PreTrainedConfig
+from lerobot.types import PolicyAction, RobotAction, RobotObservation
+from lerobot.utils.constants import ACTION, OBS_STR
+from lerobot.utils.feature_utils import build_dataset_frame
 
 
 def populate_queues(

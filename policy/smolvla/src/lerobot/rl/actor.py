@@ -54,15 +54,15 @@ from functools import lru_cache
 from queue import Empty
 from typing import TYPE_CHECKING, Any
 
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators import gamepad
-from UniVTAC.policy.smolvla.src.lerobot.transport import services_pb2
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _grpc_available, require_package
+from lerobot.teleoperators import gamepad
+from lerobot.transport import services_pb2
+from lerobot.utils.import_utils import _grpc_available, require_package
 
 if TYPE_CHECKING or _grpc_available:
     import grpc
 
-    from UniVTAC.policy.smolvla.src.lerobot.transport import services_pb2_grpc
-    from UniVTAC.policy.smolvla.src.lerobot.transport.utils import (
+    from lerobot.transport import services_pb2_grpc
+    from lerobot.transport.utils import (
         bytes_to_state_dict,
         grpc_channel_options,
         python_object_to_bytes,
@@ -85,22 +85,22 @@ import torch
 from torch import nn
 from torch.multiprocessing import Queue
 
-from UniVTAC.policy.smolvla.src.lerobot.cameras import opencv  # noqa: F401
-from UniVTAC.policy.smolvla.src.lerobot.configs import parser
-from UniVTAC.policy.smolvla.src.lerobot.policies import make_policy, make_pre_post_processors
-from UniVTAC.policy.smolvla.src.lerobot.processor import TransitionKey
-from UniVTAC.policy.smolvla.src.lerobot.robots import so_follower  # noqa: F401
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators import so_leader  # noqa: F401
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators.utils import TeleopEvents
-from UniVTAC.policy.smolvla.src.lerobot.utils.device_utils import get_safe_torch_device
-from UniVTAC.policy.smolvla.src.lerobot.utils.process import ProcessSignalHandler
-from UniVTAC.policy.smolvla.src.lerobot.utils.random_utils import set_seed
-from UniVTAC.policy.smolvla.src.lerobot.utils.robot_utils import precise_sleep
-from UniVTAC.policy.smolvla.src.lerobot.utils.transition import (
+from lerobot.cameras import opencv  # noqa: F401
+from lerobot.configs import parser
+from lerobot.policies import make_policy, make_pre_post_processors
+from lerobot.processor import TransitionKey
+from lerobot.robots import so_follower  # noqa: F401
+from lerobot.teleoperators import so_leader  # noqa: F401
+from lerobot.teleoperators.utils import TeleopEvents
+from lerobot.utils.device_utils import get_safe_torch_device
+from lerobot.utils.process import ProcessSignalHandler
+from lerobot.utils.random_utils import set_seed
+from lerobot.utils.robot_utils import precise_sleep
+from lerobot.utils.transition import (
     Transition,
     move_transition_to_device,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import (
+from lerobot.utils.utils import (
     TimerManager,
     init_logging,
 )

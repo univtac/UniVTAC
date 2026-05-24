@@ -23,11 +23,11 @@ import draccus
 import gymnasium as gym
 from gymnasium.envs.registration import registry as gym_registry
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.processor import IsaaclabArenaProcessorStep, LiberoProcessorStep, PolicyProcessorPipeline
-from UniVTAC.policy.smolvla.src.lerobot.robots import RobotConfig
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators.config import TeleoperatorConfig
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import (
+from lerobot.configs import FeatureType, PolicyFeature
+from lerobot.processor import IsaaclabArenaProcessorStep, LiberoProcessorStep, PolicyProcessorPipeline
+from lerobot.robots import RobotConfig
+from lerobot.teleoperators.config import TeleoperatorConfig
+from lerobot.utils.constants import (
     ACTION,
     LIBERO_KEY_EEF_MAT,
     LIBERO_KEY_EEF_POS,
@@ -811,7 +811,7 @@ class RoboTwinEnvConfig(EnvConfig):
         return {}
 
     def create_envs(self, n_envs: int, use_async_envs: bool = True):
-        from UniVTAC.policy.smolvla.src.lerobot.envs.robotwin import create_robotwin_envs
+        from lerobot.envs.robotwin import create_robotwin_envs
 
         if not self.task:
             raise ValueError("RoboTwinEnvConfig requires `task` to be specified.")
@@ -872,7 +872,7 @@ class RoboMMEEnv(EnvConfig):
         return {}
 
     def create_envs(self, n_envs: int, use_async_envs: bool = True):
-        from UniVTAC.policy.smolvla.src.lerobot.envs.robomme import create_robomme_envs
+        from lerobot.envs.robomme import create_robomme_envs
 
         env_cls = _make_vec_env_cls(use_async_envs, n_envs)
         return create_robomme_envs(

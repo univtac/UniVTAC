@@ -31,16 +31,16 @@ from typing import Any
 
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.policies.pretrained import PreTrainedPolicy
-from UniVTAC.policy.smolvla.src.lerobot.policies.rtc import ActionQueue, LatencyTracker, reanchor_relative_rtc_prefix
-from UniVTAC.policy.smolvla.src.lerobot.policies.rtc.configuration_rtc import RTCConfig
-from UniVTAC.policy.smolvla.src.lerobot.policies.utils import prepare_observation_for_inference
-from UniVTAC.policy.smolvla.src.lerobot.processor import (
+from lerobot.policies.pretrained import PreTrainedPolicy
+from lerobot.policies.rtc import ActionQueue, LatencyTracker, reanchor_relative_rtc_prefix
+from lerobot.policies.rtc.configuration_rtc import RTCConfig
+from lerobot.policies.utils import prepare_observation_for_inference
+from lerobot.processor import (
     NormalizerProcessorStep,
     PolicyProcessorPipeline,
     RelativeActionsProcessorStep,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.feature_utils import build_dataset_frame
+from lerobot.utils.feature_utils import build_dataset_frame
 
 from ..robot_wrapper import ThreadSafeRobot
 from .base import InferenceEngine

@@ -18,13 +18,13 @@ import logging
 import time
 from typing import Any
 
-from UniVTAC.policy.smolvla.src.lerobot.motors import Motor, MotorCalibration, MotorNormMode
-from UniVTAC.policy.smolvla.src.lerobot.motors.feetech import (
+from lerobot.motors import Motor, MotorCalibration, MotorNormMode
+from lerobot.motors.feetech import (
     FeetechMotorsBus,
     OperatingMode,
 )
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotAction
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.types import RobotAction
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
 
 from ..teleoperator import Teleoperator
 from .config_openarm_mini import OpenArmMiniConfig

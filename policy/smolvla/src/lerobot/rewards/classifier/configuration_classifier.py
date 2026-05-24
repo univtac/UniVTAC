@@ -13,10 +13,10 @@
 # limitations under the License.
 from dataclasses import dataclass, field
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import NormalizationMode
-from UniVTAC.policy.smolvla.src.lerobot.configs.rewards import RewardModelConfig
-from UniVTAC.policy.smolvla.src.lerobot.optim import AdamWConfig, LRSchedulerConfig, OptimizerConfig
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import OBS_IMAGE
+from lerobot.configs import NormalizationMode
+from lerobot.configs.rewards import RewardModelConfig
+from lerobot.optim import AdamWConfig, LRSchedulerConfig, OptimizerConfig
+from lerobot.utils.constants import OBS_IMAGE
 
 
 @RewardModelConfig.register_subclass(name="reward_classifier")

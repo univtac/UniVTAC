@@ -19,13 +19,13 @@ from typing import Any
 
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.processor import (
+from lerobot.configs import PipelineFeatureType, PolicyFeature
+from lerobot.processor import (
     ObservationProcessorStep,
     ProcessorStepRegistry,
 )
-from UniVTAC.policy.smolvla.src.lerobot.robots import Robot
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import OBS_STATE
+from lerobot.robots import Robot
+from lerobot.utils.constants import OBS_STATE
 
 
 @dataclass

@@ -22,8 +22,8 @@ from functools import cached_property
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, TypedDict
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _can_available, require_package
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.utils.import_utils import _can_available, require_package
 
 if TYPE_CHECKING or _can_available:
     import can
@@ -31,8 +31,8 @@ else:
     can = SimpleNamespace(Message=object, interface=None, BusABC=object)
 import numpy as np
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.errors import DeviceNotConnectedError
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import enter_pressed, move_cursor_up
+from lerobot.utils.errors import DeviceNotConnectedError
+from lerobot.utils.utils import enter_pressed, move_cursor_up
 
 from ..motors_bus import Motor, MotorCalibration, MotorsBusBase, NameOrID, Value
 from .tables import (

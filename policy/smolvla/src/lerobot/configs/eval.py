@@ -17,8 +17,8 @@ from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
 
-from UniVTAC.policy.smolvla.src.lerobot import envs
-from UniVTAC.policy.smolvla.src.lerobot import policies  # noqa: F401
+from lerobot import envs
+from lerobot import policies  # noqa: F401
 
 from . import parser
 from .default import EvalConfig

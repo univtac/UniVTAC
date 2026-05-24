@@ -16,11 +16,11 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import PipelineFeatureType
-from UniVTAC.policy.smolvla.src.lerobot.processor import DataProcessorPipeline
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotAction, RobotObservation
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import ACTION, OBS_IMAGES, OBS_STATE, OBS_STR
-from UniVTAC.policy.smolvla.src.lerobot.utils.feature_utils import hw_to_dataset_features
+from lerobot.configs import PipelineFeatureType
+from lerobot.processor import DataProcessorPipeline
+from lerobot.types import RobotAction, RobotObservation
+from lerobot.utils.constants import ACTION, OBS_IMAGES, OBS_STATE, OBS_STR
+from lerobot.utils.feature_utils import hw_to_dataset_features
 
 
 def create_initial_features(

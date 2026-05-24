@@ -21,12 +21,12 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from UniVTAC.policy.smolvla.src.lerobot.datasets.utils import DEFAULT_VIDEO_FILE_SIZE_IN_MB
-from UniVTAC.policy.smolvla.src.lerobot.utils.action_interpolator import ActionInterpolator
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import OBS_STR
-from UniVTAC.policy.smolvla.src.lerobot.utils.feature_utils import build_dataset_frame
-from UniVTAC.policy.smolvla.src.lerobot.utils.robot_utils import precise_sleep
-from UniVTAC.policy.smolvla.src.lerobot.utils.visualization_utils import log_rerun_data
+from lerobot.datasets.utils import DEFAULT_VIDEO_FILE_SIZE_IN_MB
+from lerobot.utils.action_interpolator import ActionInterpolator
+from lerobot.utils.constants import OBS_STR
+from lerobot.utils.feature_utils import build_dataset_frame
+from lerobot.utils.robot_utils import precise_sleep
+from lerobot.utils.visualization_utils import log_rerun_data
 
 from ..inference import InferenceEngine
 

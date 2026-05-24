@@ -19,18 +19,18 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from UniVTAC.policy.smolvla.src.lerobot.robots import RobotConfig, make_robot_from_config
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators import gamepad, keyboard, make_teleoperator_from_config
+from lerobot.robots import RobotConfig, make_robot_from_config
+from lerobot.teleoperators import gamepad, keyboard, make_teleoperator_from_config
 import gymnasium as gym
 import numpy as np
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.cameras import opencv  # noqa: F401
-from UniVTAC.policy.smolvla.src.lerobot.configs import parser
-from UniVTAC.policy.smolvla.src.lerobot.datasets import LeRobotDataset
-from UniVTAC.policy.smolvla.src.lerobot.envs import HILSerlRobotEnvConfig
-from UniVTAC.policy.smolvla.src.lerobot.model import RobotKinematics
-from UniVTAC.policy.smolvla.src.lerobot.processor import (
+from lerobot.cameras import opencv  # noqa: F401
+from lerobot.configs import parser
+from lerobot.datasets import LeRobotDataset
+from lerobot.envs import HILSerlRobotEnvConfig
+from lerobot.model import RobotKinematics
+from lerobot.processor import (
     AddBatchDimensionProcessorStep,
     AddTeleopActionAsComplimentaryDataStep,
     AddTeleopEventsAsInfoStep,
@@ -54,26 +54,26 @@ from UniVTAC.policy.smolvla.src.lerobot.processor import (
     create_transition,
     identity_transition,
 )
-from UniVTAC.policy.smolvla.src.lerobot.robots import (  # noqa: F401
+from lerobot.robots import (  # noqa: F401
     so_follower,
 )
-from UniVTAC.policy.smolvla.src.lerobot.robots.robot import Robot
-from UniVTAC.policy.smolvla.src.lerobot.robots.so_follower.robot_kinematic_processor import (
+from lerobot.robots.robot import Robot
+from lerobot.robots.so_follower.robot_kinematic_processor import (
     EEBoundsAndSafety,
     EEReferenceAndDelta,
     ForwardKinematicsJointsToEEObservation,
     GripperVelocityToJoint,
     InverseKinematicsRLStep,
 )
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators import (
+from lerobot.teleoperators import (
     so_leader,  # noqa: F401
 )
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators.teleoperator import Teleoperator
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators.utils import TeleopEvents
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import ACTION, DONE, OBS_IMAGES, OBS_STATE, REWARD
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import require_package
-from UniVTAC.policy.smolvla.src.lerobot.utils.robot_utils import precise_sleep
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import log_say
+from lerobot.teleoperators.teleoperator import Teleoperator
+from lerobot.teleoperators.utils import TeleopEvents
+from lerobot.utils.constants import ACTION, DONE, OBS_IMAGES, OBS_STATE, REWARD
+from lerobot.utils.import_utils import require_package
+from lerobot.utils.robot_utils import precise_sleep
+from lerobot.utils.utils import log_say
 
 from .joint_observations_processor import JointVelocityProcessorStep, MotorCurrentProcessorStep
 

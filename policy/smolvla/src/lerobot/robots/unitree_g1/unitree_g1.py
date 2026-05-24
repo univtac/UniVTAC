@@ -25,9 +25,9 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import numpy as np
 
-from UniVTAC.policy.smolvla.src.lerobot.cameras import make_cameras_from_configs
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotAction, RobotObservation
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _unitree_sdk_available, require_package
+from lerobot.cameras import make_cameras_from_configs
+from lerobot.types import RobotAction, RobotObservation
+from lerobot.utils.import_utils import _unitree_sdk_available, require_package
 
 from ..robot import Robot
 from .config_unitree_g1 import UnitreeG1Config
@@ -291,7 +291,7 @@ class UnitreeG1(Robot):
     def connect(self, calibrate: bool = True) -> None:  # connect to DDS
         # Initialize DDS channel and simulation environment
         if self.config.is_simulation:
-            from UniVTAC.policy.smolvla.src.lerobot.envs import make_env
+            from lerobot.envs import make_env
 
             self._ChannelFactoryInitialize(0, "lo")
             self._env_wrapper = make_env("lerobot/unitree-g1-mujoco", trust_remote_code=True)

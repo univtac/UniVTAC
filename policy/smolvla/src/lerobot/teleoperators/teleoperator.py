@@ -19,9 +19,9 @@ from typing import Any
 
 import draccus
 
-from UniVTAC.policy.smolvla.src.lerobot.motors.motors_bus import MotorCalibration
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotAction
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import HF_LEROBOT_CALIBRATION, TELEOPERATORS
+from lerobot.motors.motors_bus import MotorCalibration
+from lerobot.types import RobotAction
+from lerobot.utils.constants import HF_LEROBOT_CALIBRATION, TELEOPERATORS
 
 from .config import TeleoperatorConfig
 

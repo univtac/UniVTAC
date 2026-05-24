@@ -22,8 +22,8 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
-from UniVTAC.policy.smolvla.src.lerobot.configs.recipe import DEFAULT_BINDINGS, PLACEHOLDER_RE, TrainingRecipe
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import unwrap_scalar
+from lerobot.configs.recipe import DEFAULT_BINDINGS, PLACEHOLDER_RE, TrainingRecipe
+from lerobot.utils.utils import unwrap_scalar
 
 from .language import LANGUAGE_PERSISTENT, column_for_style
 

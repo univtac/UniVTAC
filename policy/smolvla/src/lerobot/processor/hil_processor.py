@@ -23,13 +23,13 @@ import numpy as np
 import torch
 import torchvision.transforms.functional as F  # noqa: N812
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators.utils import TeleopEvents
+from lerobot.configs import PipelineFeatureType, PolicyFeature
+from lerobot.teleoperators.utils import TeleopEvents
 
 if TYPE_CHECKING:
-    from UniVTAC.policy.smolvla.src.lerobot.teleoperators.teleoperator import Teleoperator
+    from lerobot.teleoperators.teleoperator import Teleoperator
 
-from UniVTAC.policy.smolvla.src.lerobot.types import EnvTransition, PolicyAction, TransitionKey
+from lerobot.types import EnvTransition, PolicyAction, TransitionKey
 
 from .pipeline import (
     ComplementaryDataProcessorStep,
@@ -577,7 +577,7 @@ class RewardClassifierProcessorStep(ProcessorStep):
     def __post_init__(self):
         """Initializes the reward classifier model after the dataclass is created."""
         if self.pretrained_path is not None:
-            from UniVTAC.policy.smolvla.src.lerobot.rewards.classifier.modeling_classifier import Classifier
+            from lerobot.rewards.classifier.modeling_classifier import Classifier
 
             self.reward_classifier = Classifier.from_pretrained(self.pretrained_path)
             self.reward_classifier.to(self.device)

@@ -23,12 +23,12 @@ import draccus
 import torch
 from safetensors.torch import load_file, save_file
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import (
+from lerobot.utils.constants import (
     OPTIMIZER_PARAM_GROUPS,
     OPTIMIZER_STATE,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.io_utils import deserialize_json_into_object, write_json
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import flatten_dict, unflatten_dict
+from lerobot.utils.io_utils import deserialize_json_into_object, write_json
+from lerobot.utils.utils import flatten_dict, unflatten_dict
 
 # Type alias for parameters accepted by optimizer build() methods.
 # This matches PyTorch's optimizer signature while also supporting:

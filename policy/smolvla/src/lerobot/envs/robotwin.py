@@ -27,7 +27,7 @@ import numpy as np
 import torch
 from gymnasium import spaces
 
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotObservation
+from lerobot.types import RobotObservation
 
 from .utils import _LazyAsyncVectorEnv
 
@@ -128,7 +128,7 @@ def _load_robotwin_setup_kwargs(task_name: str) -> dict[str, Any]:
     import os
 
     import yaml  # type: ignore[import-untyped]
-    from UniVTAC.policy.smolvla.src.lerobot.envs import CONFIGS_PATH  # type: ignore[import-not-found]
+    from lerobot.envs import CONFIGS_PATH  # type: ignore[import-not-found]
 
     task_config = "demo_clean"
     with open(os.path.join(CONFIGS_PATH, f"{task_config}.yml"), encoding="utf-8") as f:

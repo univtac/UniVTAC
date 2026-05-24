@@ -23,7 +23,7 @@ Available modules (import directly)::
     from lerobot.async_inference.robot_client import ...
 """
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import require_package
+from lerobot.utils.import_utils import require_package
 
 require_package("grpcio", extra="async", import_name="grpc")
 

@@ -22,14 +22,14 @@ from typing import Any
 
 import numpy as np
 
-from UniVTAC.policy.smolvla.src.lerobot.cameras import make_cameras_from_configs
-from UniVTAC.policy.smolvla.src.lerobot.motors import Motor, MotorCalibration, MotorNormMode
-from UniVTAC.policy.smolvla.src.lerobot.motors.feetech import (
+from lerobot.cameras import make_cameras_from_configs
+from lerobot.motors import Motor, MotorCalibration, MotorNormMode
+from lerobot.motors.feetech import (
     FeetechMotorsBus,
     OperatingMode,
 )
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotAction, RobotObservation
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.types import RobotAction, RobotObservation
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
 
 from ..robot import Robot
 from ..utils import ensure_safe_goal_position

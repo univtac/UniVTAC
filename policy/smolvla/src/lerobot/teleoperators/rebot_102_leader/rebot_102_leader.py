@@ -18,10 +18,10 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from UniVTAC.policy.smolvla.src.lerobot.motors import MotorCalibration
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotAction
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _motorbridge_smart_servo_available, require_package
+from lerobot.motors import MotorCalibration
+from lerobot.types import RobotAction
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.utils.import_utils import _motorbridge_smart_servo_available, require_package
 
 from ..teleoperator import Teleoperator
 from .config_rebot_102_leader import RebotArm102LeaderTeleopConfig

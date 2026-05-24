@@ -19,7 +19,7 @@ from __future__ import annotations
 from threading import Lock
 from typing import Any
 
-from UniVTAC.policy.smolvla.src.lerobot.robots import Robot
+from lerobot.robots import Robot
 
 
 class ThreadSafeRobot:

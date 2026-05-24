@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.robots.config import RobotConfig
+from lerobot.robots.config import RobotConfig
 
 from .constants import (
     DEFAULT_FPS,

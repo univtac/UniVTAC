@@ -27,15 +27,15 @@ from threading import Event
 
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType
-from UniVTAC.policy.smolvla.src.lerobot.datasets import (
+from lerobot.configs import FeatureType
+from lerobot.datasets import (
     LeRobotDataset,
     aggregate_pipeline_dataset_features,
     create_initial_features,
 )
-from UniVTAC.policy.smolvla.src.lerobot.policies import get_policy_class, make_pre_post_processors
-from UniVTAC.policy.smolvla.src.lerobot.policies.pretrained import PreTrainedPolicy
-from UniVTAC.policy.smolvla.src.lerobot.processor import (
+from lerobot.policies import get_policy_class, make_pre_post_processors
+from lerobot.policies.pretrained import PreTrainedPolicy
+from lerobot.processor import (
     PolicyProcessorPipeline,
     RobotAction,
     RobotObservation,
@@ -43,10 +43,10 @@ from UniVTAC.policy.smolvla.src.lerobot.processor import (
     make_default_processors,
     rename_stats,
 )
-from UniVTAC.policy.smolvla.src.lerobot.processor.relative_action_processor import RelativeActionsProcessorStep
-from UniVTAC.policy.smolvla.src.lerobot.robots import make_robot_from_config
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators import Teleoperator, make_teleoperator_from_config
-from UniVTAC.policy.smolvla.src.lerobot.utils.feature_utils import combine_feature_dicts, hw_to_dataset_features
+from lerobot.processor.relative_action_processor import RelativeActionsProcessorStep
+from lerobot.robots import make_robot_from_config
+from lerobot.teleoperators import Teleoperator, make_teleoperator_from_config
+from lerobot.utils.feature_utils import combine_feature_dicts, hw_to_dataset_features
 
 from .configs import BaseStrategyConfig, DAggerStrategyConfig, RolloutConfig
 from .inference import (

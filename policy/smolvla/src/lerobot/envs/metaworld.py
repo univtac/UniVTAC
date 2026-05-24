@@ -20,12 +20,12 @@ from pathlib import Path
 from typing import Any
 
 import gymnasium as gym
-import UniVTAC.policy.smolvla.src.lerobot.envs.metaworld as metaworld
+import lerobot.envs.metaworld as metaworld
 import metaworld.policies as policies
 import numpy as np
 from gymnasium import spaces
 
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotObservation
+from lerobot.types import RobotObservation
 
 from .utils import _LazyAsyncVectorEnv
 

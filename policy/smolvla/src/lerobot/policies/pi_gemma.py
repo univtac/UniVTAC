@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 import torch
 from torch import nn
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _transformers_available
+from lerobot.utils.import_utils import _transformers_available
 
 if TYPE_CHECKING or _transformers_available:
     from transformers.cache_utils import DynamicCache

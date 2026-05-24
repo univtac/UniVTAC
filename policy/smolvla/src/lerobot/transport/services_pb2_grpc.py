@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from UniVTAC.policy.smolvla.src.lerobot.transport import services_pb2 as lerobot_dot_transport_dot_services__pb2
+from lerobot.transport import services_pb2 as lerobot_dot_transport_dot_services__pb2
 
 GRPC_GENERATED_VERSION = '1.73.1'
 GRPC_VERSION = grpc.__version__

@@ -16,7 +16,7 @@ from typing import Any
 
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.processor import (
+from lerobot.processor import (
     DeviceProcessorStep,
     IdentityProcessorStep,
     NormalizerProcessorStep,

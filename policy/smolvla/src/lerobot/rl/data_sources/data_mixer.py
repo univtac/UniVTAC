@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import abc
 
-from UniVTAC.policy.smolvla.src.lerobot.types import BatchType
+from lerobot.types import BatchType
 
 from ..buffer import ReplayBuffer, concatenate_batch_transitions
 

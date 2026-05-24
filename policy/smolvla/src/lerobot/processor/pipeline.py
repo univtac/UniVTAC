@@ -45,10 +45,10 @@ import torch
 from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file, save_file
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.types import EnvAction, EnvTransition, PolicyAction, RobotAction, RobotObservation, TransitionKey
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import HF_LEROBOT_HOME
-from UniVTAC.policy.smolvla.src.lerobot.utils.hub import HubMixin
+from lerobot.configs import PipelineFeatureType, PolicyFeature
+from lerobot.types import EnvAction, EnvTransition, PolicyAction, RobotAction, RobotObservation, TransitionKey
+from lerobot.utils.constants import HF_LEROBOT_HOME
+from lerobot.utils.hub import HubMixin
 
 from .converters import batch_to_transition, create_transition, transition_to_batch
 

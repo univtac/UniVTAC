@@ -215,11 +215,11 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import VideoEncoderConfig, camera_encoder_defaults
+from lerobot.configs import VideoEncoderConfig, camera_encoder_defaults
 import draccus
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import parser
-from UniVTAC.policy.smolvla.src.lerobot.datasets import (
+from lerobot.configs import parser
+from lerobot.datasets import (
     LeRobotDataset,
     convert_image_to_video_dataset,
     delete_episodes,
@@ -230,8 +230,8 @@ from UniVTAC.policy.smolvla.src.lerobot.datasets import (
     remove_feature,
     split_dataset,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import HF_LEROBOT_HOME
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import init_logging
+from lerobot.utils.constants import HF_LEROBOT_HOME
+from lerobot.utils.utils import init_logging
 
 
 @dataclass

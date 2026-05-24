@@ -28,7 +28,7 @@ from pathlib import Path
 
 
 def find_available_ports():
-    from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import require_package
+    from lerobot.utils.import_utils import require_package
 
     require_package("pyserial", extra="hardware", import_name="serial")
     from serial.tools import list_ports

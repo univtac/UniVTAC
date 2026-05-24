@@ -22,8 +22,8 @@ from pathlib import Path
 from huggingface_hub.constants import SAFETENSORS_SINGLE_FILE
 from termcolor import colored
 
-from UniVTAC.policy.smolvla.src.lerobot.configs.train import TrainPipelineConfig
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import PRETRAINED_MODEL_DIR
+from lerobot.configs.train import TrainPipelineConfig
+from lerobot.utils.constants import PRETRAINED_MODEL_DIR
 
 
 def cfg_to_group(

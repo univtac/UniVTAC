@@ -29,11 +29,11 @@ from huggingface_hub.errors import HfHubHTTPError
 from safetensors.torch import load_model as load_model_as_safetensor, save_model as save_model_as_safetensor
 from torch import Tensor, nn
 
-from UniVTAC.policy.smolvla.src.lerobot.configs.rewards import RewardModelConfig
-from UniVTAC.policy.smolvla.src.lerobot.utils.hub import HubMixin
+from lerobot.configs.rewards import RewardModelConfig
+from lerobot.utils.hub import HubMixin
 
 if TYPE_CHECKING:
-    from UniVTAC.policy.smolvla.src.lerobot.configs.train import TrainPipelineConfig
+    from lerobot.configs.train import TrainPipelineConfig
 
 T = TypeVar("T", bound="PreTrainedRewardModel")
 

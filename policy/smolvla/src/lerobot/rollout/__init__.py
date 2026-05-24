@@ -14,7 +14,7 @@
 
 """Policy deployment engine with pluggable rollout strategies."""
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import require_package
+from lerobot.utils.import_utils import require_package
 
 require_package("datasets", extra="dataset")
 

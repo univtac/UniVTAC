@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _serial_available, require_package
+from lerobot.utils.import_utils import _serial_available, require_package
 
 if TYPE_CHECKING or _serial_available:
     import serial

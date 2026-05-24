@@ -18,8 +18,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from UniVTAC.policy.smolvla.src.lerobot.configs.default import DatasetConfig
-from UniVTAC.policy.smolvla.src.lerobot.configs.train import TrainPipelineConfig
+from lerobot.configs.default import DatasetConfig
+from lerobot.configs.train import TrainPipelineConfig
 
 from .algorithms.configs import RLAlgorithmConfig
 from .algorithms.factory import make_algorithm_config

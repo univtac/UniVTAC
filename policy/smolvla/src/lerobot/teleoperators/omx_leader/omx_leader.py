@@ -17,13 +17,13 @@
 import logging
 import time
 
-from UniVTAC.policy.smolvla.src.lerobot.motors import Motor, MotorCalibration, MotorNormMode
-from UniVTAC.policy.smolvla.src.lerobot.motors.dynamixel import (
+from lerobot.motors import Motor, MotorCalibration, MotorNormMode
+from lerobot.motors.dynamixel import (
     DriveMode,
     DynamixelMotorsBus,
     OperatingMode,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
 
 from ..teleoperator import Teleoperator
 from .config_omx_leader import OmxLeaderConfig

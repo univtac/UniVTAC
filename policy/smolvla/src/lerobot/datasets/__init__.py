@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import require_package
+from lerobot.utils.import_utils import require_package
 
 require_package("datasets", extra="dataset")
 require_package("av", extra="dataset")

@@ -20,16 +20,16 @@ from collections import deque
 from pprint import pformat
 from typing import TYPE_CHECKING
 
-from UniVTAC.policy.smolvla.src.lerobot.motors import MotorCalibration
-from UniVTAC.policy.smolvla.src.lerobot.motors.motors_bus import MotorNormMode
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _serial_available, require_package
+from lerobot.motors import MotorCalibration
+from lerobot.motors.motors_bus import MotorNormMode
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.utils.import_utils import _serial_available, require_package
 
 if TYPE_CHECKING or _serial_available:
     import serial
 else:
     serial = None  # type: ignore[assignment]
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import enter_pressed, move_cursor_up
+from lerobot.utils.utils import enter_pressed, move_cursor_up
 
 from ..teleoperator import Teleoperator
 from .config_homunculus import HomunculusGloveConfig

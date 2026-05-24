@@ -29,7 +29,7 @@ from collections import deque
 
 import cv2
 import numpy as np
-import UniVTAC.policy.smolvla.src.lerobot.cameras.zmq as zmq
+import lerobot.cameras.zmq as zmq
 
 from ..configs import ColorMode
 from ..opencv import OpenCVCamera, OpenCVCameraConfig

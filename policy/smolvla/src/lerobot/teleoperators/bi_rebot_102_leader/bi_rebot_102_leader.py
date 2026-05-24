@@ -17,8 +17,8 @@
 import logging
 from functools import cached_property
 
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotAction
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.types import RobotAction
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
 
 from ..rebot_102_leader import RebotArm102Leader, RebotArm102LeaderTeleopConfig
 from ..teleoperator import Teleoperator

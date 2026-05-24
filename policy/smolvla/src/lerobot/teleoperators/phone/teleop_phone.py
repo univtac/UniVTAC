@@ -25,9 +25,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _hebi_available, _teleop_available, require_package
-from UniVTAC.policy.smolvla.src.lerobot.utils.rotation import Rotation
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.utils.import_utils import _hebi_available, _teleop_available, require_package
+from lerobot.utils.rotation import Rotation
 
 if TYPE_CHECKING or _hebi_available:
     import hebi

@@ -18,11 +18,11 @@ from pprint import pformat
 
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import PreTrainedConfig
-from UniVTAC.policy.smolvla.src.lerobot.configs.rewards import RewardModelConfig
-from UniVTAC.policy.smolvla.src.lerobot.configs.train import TrainPipelineConfig
-from UniVTAC.policy.smolvla.src.lerobot.transforms import ImageTransforms
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import ACTION, IMAGENET_STATS, OBS_PREFIX, REWARD
+from lerobot.configs import PreTrainedConfig
+from lerobot.configs.rewards import RewardModelConfig
+from lerobot.configs.train import TrainPipelineConfig
+from lerobot.transforms import ImageTransforms
+from lerobot.utils.constants import ACTION, IMAGENET_STATS, OBS_PREFIX, REWARD
 
 from .dataset_metadata import LeRobotDatasetMetadata
 from .lerobot_dataset import LeRobotDataset

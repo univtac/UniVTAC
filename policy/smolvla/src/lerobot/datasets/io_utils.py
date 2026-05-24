@@ -16,20 +16,20 @@
 from pathlib import Path
 from typing import Any
 
-import UniVTAC.policy.smolvla.src.lerobot.datasets as datasets
+import lerobot.datasets as datasets
 import numpy as np
 import pandas
 import pandas as pd
 import pyarrow.dataset as pa_ds
 import pyarrow.parquet as pq
 import torch
-from UniVTAC.policy.smolvla.src.lerobot.datasets import Dataset
+from lerobot.datasets import Dataset
 from datasets.table import embed_table_storage
 from PIL import Image as PILImage
 from torchvision import transforms
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.io_utils import load_json, write_json
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import SuppressProgressBars, flatten_dict, unflatten_dict
+from lerobot.utils.io_utils import load_json, write_json
+from lerobot.utils.utils import SuppressProgressBars, flatten_dict, unflatten_dict
 
 from .language import LANGUAGE_COLUMNS
 from .utils import (

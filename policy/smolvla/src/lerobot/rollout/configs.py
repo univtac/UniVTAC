@@ -20,14 +20,14 @@ import abc
 import logging
 from dataclasses import dataclass, field
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import PreTrainedConfig
+from lerobot.configs import PreTrainedConfig
 import draccus
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import parser
-from UniVTAC.policy.smolvla.src.lerobot.configs.dataset import DatasetRecordConfig
-from UniVTAC.policy.smolvla.src.lerobot.robots.config import RobotConfig
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators.config import TeleoperatorConfig
-from UniVTAC.policy.smolvla.src.lerobot.utils.device_utils import auto_select_torch_device, is_torch_device_available
+from lerobot.configs import parser
+from lerobot.configs.dataset import DatasetRecordConfig
+from lerobot.robots.config import RobotConfig
+from lerobot.teleoperators.config import TeleoperatorConfig
+from lerobot.utils.device_utils import auto_select_torch_device, is_torch_device_available
 
 from .inference import InferenceEngineConfig, SyncInferenceConfig
 

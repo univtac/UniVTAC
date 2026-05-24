@@ -26,7 +26,7 @@ import torch.nn.functional as F  # noqa: N812
 from torch import Tensor
 from torch.optim import Optimizer
 
-from UniVTAC.policy.smolvla.src.lerobot.policies.gaussian_actor.modeling_gaussian_actor import (
+from lerobot.policies.gaussian_actor.modeling_gaussian_actor import (
     DISCRETE_DIMENSION_INDEX,
     MLP,
     DiscreteCritic,
@@ -34,10 +34,10 @@ from UniVTAC.policy.smolvla.src.lerobot.policies.gaussian_actor.modeling_gaussia
     GaussianActorPolicy,
     orthogonal_init,
 )
-from UniVTAC.policy.smolvla.src.lerobot.policies.utils import get_device_from_parameters
-from UniVTAC.policy.smolvla.src.lerobot.types import BatchType
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import ACTION
-from UniVTAC.policy.smolvla.src.lerobot.utils.transition import move_state_dict_to_device
+from lerobot.policies.utils import get_device_from_parameters
+from lerobot.types import BatchType
+from lerobot.utils.constants import ACTION
+from lerobot.utils.transition import move_state_dict_to_device
 
 from ..base import RLAlgorithm
 from ..configs import TrainingStats

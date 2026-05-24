@@ -38,11 +38,11 @@ import torch
 from datasets.features.features import register_feature
 from PIL import Image
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import (
+from lerobot.configs import (
     VideoEncoderConfig,
     camera_encoder_defaults,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import get_safe_default_video_backend
+from lerobot.utils.import_utils import get_safe_default_video_backend
 
 logger = logging.getLogger(__name__)
 

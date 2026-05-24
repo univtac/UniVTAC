@@ -28,7 +28,7 @@ from typing import Any, TypeVar, cast
 import draccus
 import yaml  # type: ignore[import-untyped]
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import has_method
+from lerobot.utils.utils import has_method
 
 F = TypeVar("F", bound=Callable[..., object])
 

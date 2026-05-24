@@ -53,13 +53,13 @@ from pathlib import Path
 from pprint import pformat
 from typing import TYPE_CHECKING, Any
 
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators import gamepad
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _grpc_available, require_package
+from lerobot.teleoperators import gamepad
+from lerobot.utils.import_utils import _grpc_available, require_package
 
 if TYPE_CHECKING or _grpc_available:
     import grpc
 
-    from UniVTAC.policy.smolvla.src.lerobot.transport import services_pb2_grpc
+    from lerobot.transport import services_pb2_grpc
 else:
     grpc = None
     services_pb2_grpc = None
@@ -72,27 +72,27 @@ from torch import nn
 from torch.multiprocessing import Queue
 from torch.optim.optimizer import Optimizer
 
-from UniVTAC.policy.smolvla.src.lerobot.cameras import opencv  # noqa: F401
-from UniVTAC.policy.smolvla.src.lerobot.common.train_utils import (
+from lerobot.cameras import opencv  # noqa: F401
+from lerobot.common.train_utils import (
     get_step_checkpoint_dir,
     load_training_state as utils_load_training_state,
     save_checkpoint,
     update_last_checkpoint,
 )
-from UniVTAC.policy.smolvla.src.lerobot.common.wandb_utils import WandBLogger
-from UniVTAC.policy.smolvla.src.lerobot.configs import parser
-from UniVTAC.policy.smolvla.src.lerobot.datasets import LeRobotDataset, make_dataset
-from UniVTAC.policy.smolvla.src.lerobot.policies import make_policy, make_pre_post_processors
-from UniVTAC.policy.smolvla.src.lerobot.robots import so_follower  # noqa: F401
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators import so_leader  # noqa: F401
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators.utils import TeleopEvents
-from UniVTAC.policy.smolvla.src.lerobot.transport.utils import (
+from lerobot.common.wandb_utils import WandBLogger
+from lerobot.configs import parser
+from lerobot.datasets import LeRobotDataset, make_dataset
+from lerobot.policies import make_policy, make_pre_post_processors
+from lerobot.robots import so_follower  # noqa: F401
+from lerobot.teleoperators import so_leader  # noqa: F401
+from lerobot.teleoperators.utils import TeleopEvents
+from lerobot.transport.utils import (
     MAX_MESSAGE_SIZE,
     bytes_to_python_object,
     bytes_to_transitions,
     state_to_bytes,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import (
+from lerobot.utils.constants import (
     ACTION,
     ALGORITHM_DIR,
     CHECKPOINTS_DIR,
@@ -101,11 +101,11 @@ from UniVTAC.policy.smolvla.src.lerobot.utils.constants import (
     TRAINING_STATE_DIR,
     TRAINING_STEP,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.device_utils import get_safe_torch_device
-from UniVTAC.policy.smolvla.src.lerobot.utils.io_utils import load_json, write_json
-from UniVTAC.policy.smolvla.src.lerobot.utils.process import ProcessSignalHandler
-from UniVTAC.policy.smolvla.src.lerobot.utils.random_utils import set_seed
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import (
+from lerobot.utils.device_utils import get_safe_torch_device
+from lerobot.utils.io_utils import load_json, write_json
+from lerobot.utils.process import ProcessSignalHandler
+from lerobot.utils.random_utils import set_seed
+from lerobot.utils.utils import (
     format_big_number,
     init_logging,
 )
@@ -170,7 +170,7 @@ def train(cfg: TrainRLServerPipelineConfig, job_name: str | None = None):
 
     # Setup WandB logging if enabled
     if cfg.wandb.enable and cfg.wandb.project:
-        from UniVTAC.policy.smolvla.src.lerobot.common.wandb_utils import WandBLogger
+        from lerobot.common.wandb_utils import WandBLogger
 
         wandb_logger = WandBLogger(cfg)
     else:

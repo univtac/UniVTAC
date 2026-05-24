@@ -24,9 +24,9 @@ from dataclasses import dataclass, field
 
 from torch import Tensor
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.types import EnvTransition, PolicyAction
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import OBS_ENV_STATE, OBS_IMAGE, OBS_IMAGES, OBS_STATE
+from lerobot.configs import PipelineFeatureType, PolicyFeature
+from lerobot.types import EnvTransition, PolicyAction
+from lerobot.utils.constants import OBS_ENV_STATE, OBS_IMAGE, OBS_IMAGES, OBS_STATE
 
 from .pipeline import (
     ComplementaryDataProcessorStep,

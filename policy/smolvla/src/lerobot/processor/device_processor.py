@@ -24,9 +24,9 @@ from typing import Any
 
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.types import EnvTransition, PolicyAction, TransitionKey
-from UniVTAC.policy.smolvla.src.lerobot.utils.device_utils import get_safe_torch_device
+from lerobot.configs import PipelineFeatureType, PolicyFeature
+from lerobot.types import EnvTransition, PolicyAction, TransitionKey
+from lerobot.utils.device_utils import get_safe_torch_device
 
 from .pipeline import ProcessorStep, ProcessorStepRegistry
 

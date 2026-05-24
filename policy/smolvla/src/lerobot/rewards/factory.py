@@ -20,8 +20,8 @@ from typing import Any
 
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.configs.rewards import RewardModelConfig
-from UniVTAC.policy.smolvla.src.lerobot.processor import PolicyAction, PolicyProcessorPipeline
+from lerobot.configs.rewards import RewardModelConfig
+from lerobot.processor import PolicyAction, PolicyProcessorPipeline
 
 from .classifier.configuration_classifier import RewardClassifierConfig
 from .pretrained import PreTrainedRewardModel
@@ -46,11 +46,11 @@ def get_reward_model_class(name: str) -> type[PreTrainedRewardModel]:
         ValueError: If the reward model name is not recognized.
     """
     if name == "reward_classifier":
-        from UniVTAC.policy.smolvla.src.lerobot.rewards.classifier.modeling_classifier import Classifier
+        from lerobot.rewards.classifier.modeling_classifier import Classifier
 
         return Classifier
     elif name == "sarm":
-        from UniVTAC.policy.smolvla.src.lerobot.rewards.sarm.modeling_sarm import SARMRewardModel
+        from lerobot.rewards.sarm.modeling_sarm import SARMRewardModel
 
         return SARMRewardModel
     else:
@@ -146,7 +146,7 @@ def make_reward_pre_post_processors(
     """
     # Create a new processor based on reward model type
     if isinstance(reward_cfg, RewardClassifierConfig):
-        from UniVTAC.policy.smolvla.src.lerobot.rewards.classifier.processor_classifier import make_classifier_processor
+        from lerobot.rewards.classifier.processor_classifier import make_classifier_processor
 
         return make_classifier_processor(
             config=reward_cfg,
@@ -154,7 +154,7 @@ def make_reward_pre_post_processors(
         )
 
     elif isinstance(reward_cfg, SARMConfig):
-        from UniVTAC.policy.smolvla.src.lerobot.rewards.sarm.processor_sarm import make_sarm_pre_post_processors
+        from lerobot.rewards.sarm.processor_sarm import make_sarm_pre_post_processors
 
         return make_sarm_pre_post_processors(
             config=reward_cfg,

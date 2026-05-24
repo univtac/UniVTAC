@@ -23,9 +23,9 @@ import cv2
 import numpy as np
 import requests
 
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotAction, RobotObservation
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
-from UniVTAC.policy.smolvla.src.lerobot.utils.errors import DeviceNotConnectedError
+from lerobot.types import RobotAction, RobotObservation
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.utils.errors import DeviceNotConnectedError
 
 from ..robot import Robot
 from .config_earthrover_mini_plus import EarthRoverMiniPlusConfig

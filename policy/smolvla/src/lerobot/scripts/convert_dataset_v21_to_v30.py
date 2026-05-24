@@ -51,7 +51,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import require_package
+from lerobot.utils.import_utils import require_package
 
 require_package("jsonlines", extra="dataset")
 
@@ -59,12 +59,12 @@ import jsonlines
 import pandas as pd
 import pyarrow as pa
 import tqdm
-from UniVTAC.policy.smolvla.src.lerobot.datasets import Dataset, Features, Image
+from lerobot.datasets import Dataset, Features, Image
 from huggingface_hub import HfApi, snapshot_download
 from requests import HTTPError
 
-from UniVTAC.policy.smolvla.src.lerobot.datasets import CODEBASE_VERSION, LeRobotDataset, aggregate_stats
-from UniVTAC.policy.smolvla.src.lerobot.datasets.io_utils import (
+from lerobot.datasets import CODEBASE_VERSION, LeRobotDataset, aggregate_stats
+from lerobot.datasets.io_utils import (
     cast_stats_to_numpy,
     get_file_size_in_mb,
     get_parquet_file_size_in_mb,
@@ -76,7 +76,7 @@ from UniVTAC.policy.smolvla.src.lerobot.datasets.io_utils import (
     write_stats,
     write_tasks,
 )
-from UniVTAC.policy.smolvla.src.lerobot.datasets.utils import (
+from lerobot.datasets.utils import (
     DEFAULT_CHUNK_SIZE,
     DEFAULT_DATA_FILE_SIZE_IN_MB,
     DEFAULT_DATA_PATH,
@@ -89,9 +89,9 @@ from UniVTAC.policy.smolvla.src.lerobot.datasets.utils import (
     DatasetInfo,
     update_chunk_file_indices,
 )
-from UniVTAC.policy.smolvla.src.lerobot.datasets.video_utils import concatenate_video_files, get_video_duration_in_s
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import HF_LEROBOT_HOME
-from UniVTAC.policy.smolvla.src.lerobot.utils.utils import flatten_dict, init_logging
+from lerobot.datasets.video_utils import concatenate_video_files, get_video_duration_in_s
+from lerobot.utils.constants import HF_LEROBOT_HOME
+from lerobot.utils.utils import flatten_dict, init_logging
 
 V21 = "v2.1"
 V30 = "v3.0"

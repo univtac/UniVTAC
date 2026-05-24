@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.action_interpolator import ActionInterpolator as ActionInterpolator
+from lerobot.utils.action_interpolator import ActionInterpolator as ActionInterpolator
 
 from .act.configuration_act import ACTConfig as ACTConfig
 from .diffusion.configuration_diffusion import DiffusionConfig as DiffusionConfig

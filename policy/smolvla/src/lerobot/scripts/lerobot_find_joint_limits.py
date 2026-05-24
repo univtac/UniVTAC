@@ -38,19 +38,19 @@ lerobot-find-joint-limits \
 import time
 from dataclasses import dataclass
 
-from UniVTAC.policy.smolvla.src.lerobot.robots import RobotConfig, bi_openarm_follower, bi_rebot_b601_follower, bi_so_follower, koch_follower, make_robot_from_config, omx_follower, openarm_follower, rebot_b601_follower
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators import TeleoperatorConfig, bi_openarm_leader, bi_rebot_102_leader, bi_so_leader, gamepad, koch_leader, make_teleoperator_from_config, omx_leader, openarm_leader, openarm_mini, rebot_102_leader
+from lerobot.robots import RobotConfig, bi_openarm_follower, bi_rebot_b601_follower, bi_so_follower, koch_follower, make_robot_from_config, omx_follower, openarm_follower, rebot_b601_follower
+from lerobot.teleoperators import TeleoperatorConfig, bi_openarm_leader, bi_rebot_102_leader, bi_so_leader, gamepad, koch_leader, make_teleoperator_from_config, omx_leader, openarm_leader, openarm_mini, rebot_102_leader
 import draccus
 import numpy as np
 
-from UniVTAC.policy.smolvla.src.lerobot.model import RobotKinematics
-from UniVTAC.policy.smolvla.src.lerobot.robots import (  # noqa: F401
+from lerobot.model import RobotKinematics
+from lerobot.robots import (  # noqa: F401
     so_follower,
 )
-from UniVTAC.policy.smolvla.src.lerobot.teleoperators import (  # noqa: F401
+from lerobot.teleoperators import (  # noqa: F401
     so_leader,
 )
-from UniVTAC.policy.smolvla.src.lerobot.utils.robot_utils import precise_sleep
+from lerobot.utils.robot_utils import precise_sleep
 
 
 @dataclass

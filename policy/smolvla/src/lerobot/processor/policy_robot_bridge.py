@@ -19,9 +19,9 @@ from typing import Any
 
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.types import PolicyAction, RobotAction
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import ACTION
+from lerobot.configs import FeatureType, PipelineFeatureType, PolicyFeature
+from lerobot.types import PolicyAction, RobotAction
+from lerobot.utils.constants import ACTION
 
 from .pipeline import ActionProcessorStep, ProcessorStepRegistry
 

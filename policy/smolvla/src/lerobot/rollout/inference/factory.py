@@ -28,9 +28,9 @@ from threading import Event
 
 import draccus
 
-from UniVTAC.policy.smolvla.src.lerobot.policies.pretrained import PreTrainedPolicy
-from UniVTAC.policy.smolvla.src.lerobot.policies.rtc.configuration_rtc import RTCConfig
-from UniVTAC.policy.smolvla.src.lerobot.processor import PolicyProcessorPipeline
+from lerobot.policies.pretrained import PreTrainedPolicy
+from lerobot.policies.rtc.configuration_rtc import RTCConfig
+from lerobot.processor import PolicyProcessorPipeline
 
 from ..robot_wrapper import ThreadSafeRobot
 from .base import InferenceEngine

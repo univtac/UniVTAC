@@ -14,9 +14,9 @@
 
 from dataclasses import dataclass, field
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, NormalizationMode, PolicyFeature, PreTrainedConfig
-from UniVTAC.policy.smolvla.src.lerobot.optim import AdamWConfig, CosineDecayWithWarmupSchedulerConfig
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import OBS_IMAGES
+from lerobot.configs import FeatureType, NormalizationMode, PolicyFeature, PreTrainedConfig
+from lerobot.optim import AdamWConfig, CosineDecayWithWarmupSchedulerConfig
+from lerobot.utils.constants import OBS_IMAGES
 
 from ..rtc.configuration_rtc import RTCConfig
 

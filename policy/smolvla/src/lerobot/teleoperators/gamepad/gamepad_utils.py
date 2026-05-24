@@ -17,7 +17,7 @@
 import logging
 from typing import TYPE_CHECKING
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _hidapi_available, _pygame_available, require_package
+from lerobot.utils.import_utils import _hidapi_available, _pygame_available, require_package
 
 from ..utils import TeleopEvents
 

@@ -27,7 +27,7 @@ from huggingface_hub import hf_hub_download
 from huggingface_hub.constants import CONFIG_NAME
 from huggingface_hub.errors import HfHubHTTPError
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.hub import HubMixin
+from lerobot.utils.hub import HubMixin
 
 T = TypeVar("T", bound="RLAlgorithmConfig")
 

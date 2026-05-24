@@ -20,16 +20,16 @@ import time
 from multiprocessing import Event, Queue
 from typing import TYPE_CHECKING
 
-from UniVTAC.policy.smolvla.src.lerobot.transport import services_pb2
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _grpc_available
+from lerobot.transport import services_pb2
+from lerobot.utils.import_utils import _grpc_available
 
 from .queue import get_last_item_from_queue
 
 if TYPE_CHECKING or _grpc_available:
     import grpc
 
-    from UniVTAC.policy.smolvla.src.lerobot.transport import services_pb2_grpc
-    from UniVTAC.policy.smolvla.src.lerobot.transport.utils import receive_bytes_in_chunks, send_bytes_in_chunks
+    from lerobot.transport import services_pb2_grpc
+    from lerobot.transport.utils import receive_bytes_in_chunks, send_bytes_in_chunks
 
     _ServicerBase = services_pb2_grpc.LearnerServiceServicer
 else:

@@ -28,8 +28,8 @@ from huggingface_hub.errors import HfHubHTTPError
 from safetensors.torch import load_file as load_safetensors, save_file as save_safetensors
 from torch.optim import Optimizer
 
-from UniVTAC.policy.smolvla.src.lerobot.types import BatchType
-from UniVTAC.policy.smolvla.src.lerobot.utils.hub import HubMixin
+from lerobot.types import BatchType
+from lerobot.utils.hub import HubMixin
 
 from .configs import RLAlgorithmConfig, TrainingStats
 

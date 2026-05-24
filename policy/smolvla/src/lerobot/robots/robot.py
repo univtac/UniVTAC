@@ -18,9 +18,9 @@ from pathlib import Path
 
 import draccus
 
-from UniVTAC.policy.smolvla.src.lerobot.motors import MotorCalibration
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotAction, RobotObservation
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import HF_LEROBOT_CALIBRATION, ROBOTS
+from lerobot.motors import MotorCalibration
+from lerobot.types import RobotAction, RobotObservation
+from lerobot.utils.constants import HF_LEROBOT_CALIBRATION, ROBOTS
 
 from .config import RobotConfig
 

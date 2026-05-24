@@ -17,8 +17,8 @@ from dataclasses import dataclass
 
 import torch
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import OBS_IMAGES, OBS_PREFIX, OBS_STATE, OBS_STR
+from lerobot.configs import FeatureType, PipelineFeatureType, PolicyFeature
+from lerobot.utils.constants import OBS_IMAGES, OBS_PREFIX, OBS_STATE, OBS_STR
 
 from .pipeline import ObservationProcessorStep, ProcessorStepRegistry
 

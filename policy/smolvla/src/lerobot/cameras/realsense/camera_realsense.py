@@ -26,15 +26,15 @@ import cv2  # type: ignore  # TODO: add type stubs for OpenCV
 import numpy as np  # type: ignore  # TODO: add type stubs for numpy
 from numpy.typing import NDArray  # type: ignore  # TODO: add type stubs for numpy.typing
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import _pyrealsense2_available, require_package
+from lerobot.utils.import_utils import _pyrealsense2_available, require_package
 
 if TYPE_CHECKING or _pyrealsense2_available:
     import pyrealsense2 as rs
 else:
     rs = None
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
-from UniVTAC.policy.smolvla.src.lerobot.utils.errors import DeviceNotConnectedError
+from lerobot.utils.decorators import check_if_already_connected, check_if_not_connected
+from lerobot.utils.errors import DeviceNotConnectedError
 
 from ..camera import Camera
 from ..configs import ColorMode

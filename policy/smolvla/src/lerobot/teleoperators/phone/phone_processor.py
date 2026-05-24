@@ -16,9 +16,9 @@
 
 from dataclasses import dataclass, field
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.processor import ProcessorStepRegistry, RobotActionProcessorStep
-from UniVTAC.policy.smolvla.src.lerobot.types import RobotAction
+from lerobot.configs import FeatureType, PipelineFeatureType, PolicyFeature
+from lerobot.processor import ProcessorStepRegistry, RobotActionProcessorStep
+from lerobot.types import RobotAction
 
 from .config_phone import PhoneOS
 

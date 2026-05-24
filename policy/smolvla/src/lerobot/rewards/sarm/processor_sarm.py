@@ -23,7 +23,7 @@ import numpy as np
 import torch
 from PIL import Image
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.import_utils import (
+from lerobot.utils.import_utils import (
     _faker_available,
     _pandas_available,
     _transformers_available,
@@ -46,8 +46,8 @@ if TYPE_CHECKING or _faker_available:
 else:
     Faker = None  # type: ignore[assignment, misc]
 
-from UniVTAC.policy.smolvla.src.lerobot.configs import FeatureType, PipelineFeatureType, PolicyFeature
-from UniVTAC.policy.smolvla.src.lerobot.processor import (
+from lerobot.configs import FeatureType, PipelineFeatureType, PolicyFeature
+from lerobot.processor import (
     AddBatchDimensionProcessorStep,
     DeviceProcessorStep,
     NormalizerProcessorStep,
@@ -58,8 +58,8 @@ from UniVTAC.policy.smolvla.src.lerobot.processor import (
     policy_action_to_transition,
     transition_to_policy_action,
 )
-from UniVTAC.policy.smolvla.src.lerobot.types import EnvTransition, PolicyAction, TransitionKey
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import POLICY_POSTPROCESSOR_DEFAULT_NAME, POLICY_PREPROCESSOR_DEFAULT_NAME
+from lerobot.types import EnvTransition, PolicyAction, TransitionKey
+from lerobot.utils.constants import POLICY_POSTPROCESSOR_DEFAULT_NAME, POLICY_PREPROCESSOR_DEFAULT_NAME
 
 from .configuration_sarm import SARMConfig
 from .sarm_utils import (

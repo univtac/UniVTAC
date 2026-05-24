@@ -17,7 +17,7 @@ import logging
 import torch
 from torch import Tensor, nn
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import OBS_IMAGE, REWARD
+from lerobot.utils.constants import OBS_IMAGE, REWARD
 
 from ..pretrained import PreTrainedRewardModel
 from .configuration_classifier import RewardClassifierConfig

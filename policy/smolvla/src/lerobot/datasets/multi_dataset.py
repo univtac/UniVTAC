@@ -17,11 +17,11 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
-import UniVTAC.policy.smolvla.src.lerobot.datasets as datasets
+import lerobot.datasets as datasets
 import torch
 import torch.utils
 
-from UniVTAC.policy.smolvla.src.lerobot.utils.constants import HF_LEROBOT_HOME
+from lerobot.utils.constants import HF_LEROBOT_HOME
 
 from .compute_stats import aggregate_stats
 from .feature_utils import get_hf_features_from_features
