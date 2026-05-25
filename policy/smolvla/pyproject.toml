@@ -74,6 +74,7 @@ training = [
     "torchvision",
     "transformers",
     "wandb",
+    "draccus"
 ]
 hardware = [
     "opencv-python",

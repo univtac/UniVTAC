@@ -2,9 +2,10 @@ policy:
   type: smolvla
   push_to_hub: false
   use_tactile: true
-  tactile_fusion: token
+  tactile_fusion: cross_attn # film, token
   load_vlm_weights: true
   optimizer_lr: 1e-4
+  vitac_pretrained_path: "???"
 
 peft:
   method_type: lora
