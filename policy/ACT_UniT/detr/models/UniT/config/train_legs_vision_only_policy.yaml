@@ -1,0 +1,248 @@
+name: diffusion_unet_timm_policy
+_target_: UniT.workspace.train_diffusion_unet_image_workspace.TrainDiffusionUnetImageWorkspace
+
+dataset_path: &dataset_path data/chickenlegs_hanging
+horizon: &horizon 16
+
+n_obs_steps: &n_obs_steps 2
+n_action_steps: 8
+n_latency_steps: 0
+dataset_obs_steps: *n_obs_steps
+past_action_visible: False
+keypoint_visible_rate: 1.0
+obs_as_global_cond: True
+
+task_name: chickenlegs_hanging
+exp_name: train_chickenlegs_hanging_vision_only
+
+task:
+  dataset:
+    _target_: UniT.dataset.aloha_dataset.AlohaDataset
+    shape_meta:   
+      obs:    
+        cam_low:
+          shape: [3, 224, 224]
+          type: rgb
+        cam_high:
+          shape: [3, 224, 224]
+          type: rgb
+        cam_right_wrist:
+          shape: [3, 224, 224]
+          type: rgb
+        cam_left_wrist:
+          shape: [3, 224, 224]
+          type: rgb
+        qpos:
+          shape: [14]
+          type: low_dim
+      action: 
+        shape: [14]
+    dataset_path: *dataset_path
+    horizon: *horizon
+    pad_before: 1
+    pad_after: 7
+    n_obs_steps: 2
+    n_latency_steps: 0
+    seed: 42
+    val_ratio: 0.00
+    max_train_episodes: null
+  env_runner:
+    _target_: diffusion_policy.env_runner.real_pusht_image_runner.RealPushTImageRunner
+
+policy:
+  _target_: UniT.policy.diffusion_unet_timm_policy.DiffusionUnetTimmPolicy
+
+  shape_meta: 
+    obs:    
+      cam_low:
+        shape: [3, 224, 224]
+        horizon: *n_obs_steps
+        type: rgb
+      cam_high:
+        shape: [3, 224, 224]
+        horizon: *n_obs_steps
+        type: rgb
+      cam_right_wrist:
+        shape: [3, 224, 224]
+        horizon: *n_obs_steps
+        type: rgb
+      cam_left_wrist:
+        shape: [3, 224, 224]
+        horizon: *n_obs_steps
+        type: rgb
+      qpos:
+        shape: [14]
+        horizon: *n_obs_steps
+        type: low_dim
+    action: 
+      shape: [14]
+      horizon: *horizon
+  
+  noise_scheduler:
+    _target_: diffusers.DDIMScheduler
+    num_train_timesteps: 75
+    beta_start: 0.0001
+    beta_end: 0.02
+    # beta_schedule is important
+    # this is the best we found
+    beta_schedule: squaredcos_cap_v2
+    clip_sample: True
+    set_alpha_to_one: True
+    steps_offset: 0
+    prediction_type: epsilon # or sample
+
+  obs_encoder:
+    _target_: UniT.model.vision.timm_obs_encoder.TimmObsEncoder
+    shape_meta:     
+      obs:    
+        cam_low:
+          shape: [3, 224, 224]
+          horizon: *n_obs_steps
+          type: rgb
+        cam_high:
+          shape: [3, 224, 224]
+          horizon: *n_obs_steps
+          type: rgb
+        cam_right_wrist:
+          shape: [3, 224, 224]
+          horizon: *n_obs_steps
+          type: rgb
+        cam_left_wrist:
+          shape: [3, 224, 224]
+          horizon: *n_obs_steps
+          type: rgb
+        qpos:
+          shape: [14]
+          horizon: *n_obs_steps
+          type: low_dim
+      action: 
+        shape: [14]
+        horizon: *horizon
+
+    ##### from scratch #####
+    # model_name: 'vit_base_patch16_224'
+    model_name: 'resnet34'
+    pretrained: False
+    frozen: False
+
+    
+    global_pool: ''
+
+    # 'avg' or 'max' or 'soft_attention' or 'spatial_embedding' or 'transformer' or 'attention_pool_2d'
+    feature_aggregation: 'attention_pool_2d'
+    # feature_aggregation: null
+    position_encording: 'sinusoidal' # 'learnable' or 'sinusoidal'. it only works for transformer
+
+    # it only works for resnet. 32 (7x7) or 16 (14x14)
+    downsample_ratio: 32
+
+    transforms:
+      - type: RandomCrop
+        ratio: 0.95
+
+      
+
+    use_group_norm: True
+    share_rgb_model: False
+    imagenet_norm: True
+
+  num_inference_steps: 16
+  obs_as_global_cond: True
+  diffusion_step_embed_dim: 128
+  down_dims: [256,512,1024]
+  kernel_size: 5
+  n_groups: 8
+  cond_predict_scale: True
+  input_pertub: 0.1 # reference: https://github.com/forever208/DDPM-IP
+  # train multiple diffusion steps per obs encoder forward pass
+  # doing this too much will cause instability!
+  train_diffusion_n_samples: 1
+
+
+ema:
+  _target_: diffusion_policy.model.diffusion.ema_model.EMAModel
+  update_after_step: 0
+  inv_gamma: 1.0
+  power: 0.75
+  min_value: 0.0
+  max_value: 0.9999
+
+dataloader:
+  batch_size: 128
+  num_workers: 16
+  shuffle: true
+  pin_memory: false
+  persistent_workers: False
+
+val_dataloader:
+  batch_size: 128
+  num_workers: 16
+  shuffle: False
+  pin_memory: false
+  persistent_workers: False
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-4
+  betas: [0.95, 0.999]
+  eps: 1.0e-8
+  weight_decay: 1.0e-6
+
+training:
+  device: "cuda:0"
+  seed: 42
+  debug: False
+  resume: True
+  # optimization
+  lr_scheduler: cosine
+  lr_warmup_steps: 500
+  num_epochs: 500
+  gradient_accumulate_every: 1
+  # EMA destroys performance when used with BatchNorm
+  # replace BatchNorm with GroupNorm.
+  use_ema: True
+  freeze_encoder: False
+  # training loop control
+  # in epochs
+  rollout_every: 500
+  checkpoint_every: 1
+  val_every: 1
+  sample_every: 10
+  # steps per epoch
+  max_train_steps: null
+  max_val_steps: null
+  # misc
+  tqdm_interval_sec: 1.0
+  allow_val_change: True
+
+logging:
+  project: UniT_policy
+  resume: True
+  mode: online
+  name: ${name}_${task_name}_vistac
+  tags: ["${name}", "${task_name}", "${exp_name}"]
+  id: null
+  group: null
+
+
+checkpoint:
+  topk:
+    monitor_key: train_loss
+    mode: min
+    k: 5
+    format_str: 'epoch={epoch:04d}-train_loss={train_loss:.3f}.ckpt'
+  save_last_ckpt: True
+  save_last_snapshot: False
+
+multi_run:
+  run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  wandb_name_base: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
+
+hydra:
+  job:
+    override_dirname: ${name}
+  run:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  sweep:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+    subdir: ${hydra.job.num}

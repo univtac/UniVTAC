@@ -1,0 +1,36 @@
+_target_: UniT.workspace.train_byol_representation_workspace.TrainByolRepresentationWorkspace
+batch_size: &batch_size 128
+seed: 42
+image_size: 224
+model_path: representation_models/byol-key-resnet50-pretrain.pt
+device: cuda:0
+total_epoch: 5000
+pretrain: true
+model_type: resnet50
+dataset:
+  shape_meta:
+    obs:    
+      tactile_image:
+        shape: [3, 240, 320]
+        type: rgb
+  resized_image_shape: [224,224]
+
+  dataset_path: data/allen_key_gelsight
+  horizon: 1
+  max_train_episodes: null
+  pad_after: 1
+  pad_before: 1
+  seed: 42
+  val_ratio: 0
+val_dataloader:
+  batch_size: *batch_size
+  num_workers: 2
+  persistent_workers: false
+  pin_memory: true
+  shuffle: false
+dataloader:
+  batch_size: *batch_size
+  num_workers: 10
+  persistent_workers: false
+  pin_memory: true
+  shuffle: true

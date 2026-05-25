@@ -1,0 +1,45 @@
+name: data_vis
+_target_: UniT.workspace.train_diffusion_unet_image_workspace.TrainDiffusionUnetImageWorkspace
+
+
+dataset_path: &dataset_path data/chickenlegs_hanging
+task:
+  dataset:
+    _target_: UniT.dataset.aloha_dataset.AlohaDataset
+    shape_meta:   
+      obs:    
+        cam_low:
+          shape: [3, 224, 224]
+          type: rgb
+        cam_high:
+          shape: [3, 224, 224]
+          type: rgb
+        cam_right_wrist:
+          shape: [3, 224, 224]
+          type: rgb
+        cam_left_wrist:
+          shape: [3, 224, 224]
+          type: rgb
+        tactile_right_image:
+          shape: [3, 224, 224]
+          type: rgb
+        tactile_left_image:
+          shape: [3, 224, 224]
+          type: rgb
+        qpos:
+          shape: [14]
+          type: low_dim
+      action: 
+        shape: [14]
+    dataset_path: *dataset_path
+    horizon: 16
+    pad_before: 1
+    pad_after: 7
+    n_obs_steps: 2
+    n_latency_steps: 0
+    seed: 42
+    val_ratio: 0.00
+    max_train_episodes: null
+
+
+

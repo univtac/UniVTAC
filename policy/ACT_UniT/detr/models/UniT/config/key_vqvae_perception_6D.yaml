@@ -1,0 +1,119 @@
+name: train_vqvae_perception
+_target_: UniT.workspace.train_vqvae_perception_workspace.TrainVqvaePerceptionWorkspace
+dataset_path: &dataset_path data/6Dpose_gsmini
+horizon: &horizon 1
+
+task:
+  dataset:
+    _target_: UniT.dataset.tactile_perception_dataset.TactilePerceptionDataset
+    data_type: "6Dpose"
+    resized_image_shape: [128,160]
+    shape_meta:   
+      obs:    
+        tactile_left_image:
+          shape: [3, 240, 320]
+          type: rgb
+        6Dpose:
+          shape: [7]
+          type: low_dim
+    dataset_path: *dataset_path
+    horizon: *horizon
+    seed: 42
+    val_ratio: 0.1
+    max_train_episodes: null
+
+
+model:
+  _target_: UniT.perception.vqvae_perception.VqvaePerception
+  task_type: "6Dpose"
+  vq_model_config:
+    embed_dim: 3
+    n_embed: 1024
+    ckpt_path: representation_models/2024-08-01T15-09-47vq/checkpoints/checkpoint-epoch=342.ckpt
+    ddconfig:
+      double_z: False
+      z_channels: 3
+      resolution: 128
+      in_channels: 3
+      out_ch: 3
+      ch: 128
+      ch_mult: [1,1,2,4] 
+      num_res_blocks: 2
+      attn_resolutions: [16]
+      dropout: 0.0
+    lossconfig:
+      target: UniT.taming.modules.losses.vqperceptual.VQLPIPSWithDiscriminator
+      params:
+        disc_conditional: False
+        disc_in_channels: 3
+        disc_start: 10000
+        disc_weight: 0.8
+        codebook_weight: 1.0
+  latent_shape: [3,16,20]
+  freeze_encoder: True
+dataloader:
+  batch_size: 128
+  num_workers: 8
+  shuffle: true
+  pin_memory: false
+  persistent_workers: False
+
+val_dataloader:
+  batch_size: 128
+  num_workers: 8
+  shuffle: False
+  pin_memory: false
+  persistent_workers: False
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-4
+  betas: [0.95, 0.999]
+  eps: 1.0e-8
+  weight_decay: 1.0e-6
+
+training:
+  device: "cuda:0"
+  seed: 42
+  resume: True
+  lr_scheduler: cosine
+  lr_warmup_steps: 500
+  num_epochs: 400
+  gradient_accumulate_every: 1
+  checkpoint_every: 1
+  val_every: 10
+  max_train_steps: null
+  max_val_steps: null
+  tqdm_interval_sec: 1.0
+
+
+logging:
+  project: 6Dpose_benchmark
+  resume: True
+  mode: online
+  name: ${now:%Y.%m.%d-%H.%M.%S}_${name}
+  tags: ["${name}"]
+  id: null
+  group: null
+
+checkpoint:
+  topk:
+    monitor_key: train_loss
+    mode: min
+    k: 5
+    format_str: 'epoch={epoch:04d}-train_loss={train_loss:.3f}.ckpt'
+  save_last_ckpt: True
+  save_last_snapshot: False
+
+multi_run:
+  run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}
+  wandb_name_base: ${now:%Y.%m.%d-%H.%M.%S}_${name}
+
+hydra:
+  job:
+    override_dirname: ${name}
+  run:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}
+  sweep:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}
+    subdir: ${hydra.job.num}

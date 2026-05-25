@@ -1,0 +1,45 @@
+_target_: UniT.workspace.train_mae_representation_workspace.TrainMaeRepresentationWorkspace
+base_learning_rate: 1.0e-4
+weight_decay: 0.05
+batch_size: &batch_size 128
+max_device_batch_size: *batch_size
+seed: 42
+mask_ratio: 0.25
+image_size: 224
+patch_size: 16
+emb_dim: 768
+encoder_layer: 12
+encoder_head: 12
+decoder_layer: 8
+decoder_head: 16
+total_epoch: 1000
+warmup_epoch: 5
+model_path: representation_models/vit-base-mae-0.25-key.pt
+device: cuda:0
+dataset:
+  shape_meta:
+    obs:    
+      tactile_image:
+        shape: [3, 240, 320]
+        type: rgb
+  resized_image_shape: [224,224]
+
+  dataset_path: data/allen_key_gelsight
+  horizon: 1
+  max_train_episodes: null
+  pad_after: 1
+  pad_before: 1
+  seed: 42
+  val_ratio: 0
+val_dataloader:
+  batch_size: *batch_size
+  num_workers: 8
+  persistent_workers: false
+  pin_memory: true
+  shuffle: false
+dataloader:
+  batch_size: *batch_size
+  num_workers: 8
+  persistent_workers: false
+  pin_memory: true
+  shuffle: true

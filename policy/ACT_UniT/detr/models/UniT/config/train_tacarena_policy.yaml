@@ -1,0 +1,248 @@
+# 使用方法：
+#   python train.py --config-dir=./UniT/config --config-name=train_tacarena_policy.yaml
+#
+# ============================================================================
+
+name: diffusion_tacarena_policy
+_target_: UniT.workspace.train_diffusion_unet_image_workspace.TrainDiffusionUnetImageWorkspace
+
+dataset_path: &dataset_path data/insert_HDMI-clean-1
+horizon: &horizon 16
+
+n_obs_steps: &n_obs_steps 2
+n_action_steps: 8
+n_latency_steps: 0
+dataset_obs_steps: *n_obs_steps
+past_action_visible: False
+keypoint_visible_rate: 1.0
+obs_as_global_cond: True
+
+task_name: tacarena_task
+exp_name: train_tacarena_unit
+
+task:
+  dataset:
+    _target_: UniT.dataset.aloha_dataset.AlohaDataset
+    shape_meta:   
+      obs:    
+        cam_high:
+          shape: [3, 224, 224]
+          type: rgb
+        # 注意：如果数据中包含腕部相机，取消下面注释
+        # cam_wrist:
+        #   shape: [3, 224, 224]
+        #   type: rgb
+        tactile_left_image:
+          shape: [3, 128, 160]
+          type: rgb
+        tactile_right_image:
+          shape: [3, 128, 160]
+          type: rgb
+        qpos:
+          shape: [8]
+          type: low_dim
+      action: 
+        shape: [8]
+    dataset_path: *dataset_path
+    horizon: *horizon
+    pad_before: 1
+    pad_after: 7
+    n_obs_steps: 2
+    n_latency_steps: 0
+    seed: 0
+    val_ratio: 0
+    max_train_episodes: null
+  env_runner:
+    _target_: diffusion_policy.env_runner.real_pusht_image_runner.RealPushTImageRunner
+
+policy:
+  _target_: UniT.policy.diffusion_unit_policy.DiffusionUnitPolicy
+  obs_steps: *n_obs_steps
+  tactile: [left, right]
+  
+  # use_tacarena_encoder: true
+  # tacarena_encoder_config:
+  #   backbone: resnet18
+  #   latent_dims: 512
+  #   ckpt_path: null
+  #   freeze_encoder: true
+
+  vq_model_config:
+    embed_dim: 3
+    n_embed: 1024
+    ckpt_path: /mnt/data/tianxing/TacArena/policy/UniT/UniT/checkpoint-epoch=340.ckpt 
+    ddconfig:
+      double_z: False
+      z_channels: 3
+      resolution: 128
+      in_channels: 3
+      out_ch: 3
+      ch: 128
+      ch_mult: [1, 1, 2, 4]
+      num_res_blocks: 2
+      attn_resolutions: [16]
+      dropout: 0.0
+    lossconfig:
+      target: UniT.taming.modules.losses.vqperceptual.VQLPIPSWithDiscriminator
+      params:
+        disc_conditional: False
+        disc_in_channels: 3
+        disc_start: 10000
+        disc_weight: 0.8
+        codebook_weight: 1.0
+
+  shape_meta: 
+    obs:    
+      cam_high:
+        shape: [3, 224, 224]
+        horizon: *n_obs_steps
+        type: rgb
+      # 注意：如果数据中包含腕部相机，取消下面注释
+      # cam_wrist:
+      #   shape: [3, 224, 224]
+      #   horizon: *n_obs_steps
+      #   type: rgb
+      qpos:
+        shape: [8]
+        horizon: *n_obs_steps
+        type: low_dim
+    action: 
+      shape: [8]
+      horizon: *horizon
+  
+  noise_scheduler:
+    _target_: diffusers.DDIMScheduler
+    num_train_timesteps: 75
+    beta_start: 0.0001
+    beta_end: 0.02
+    beta_schedule: squaredcos_cap_v2
+    clip_sample: True
+    set_alpha_to_one: True
+    steps_offset: 0
+    prediction_type: epsilon
+
+  obs_encoder:
+    _target_: UniT.model.vision.timm_obs_encoder.TimmObsEncoder
+    shape_meta:     
+      obs:    
+        cam_high:
+          shape: [3, 224, 224]
+          horizon: *n_obs_steps
+          type: rgb
+        # 注意：如果数据中包含腕部相机，取消下面注释
+        # cam_wrist:
+        #   shape: [3, 224, 224]
+        #   horizon: *n_obs_steps
+        #   type: rgb
+        qpos:
+          shape: [8]
+          horizon: *n_obs_steps
+          type: low_dim
+      action: 
+        shape: [8]
+        horizon: *horizon
+
+    model_name: 'resnet34'
+    pretrained: False
+    frozen: False
+    global_pool: ''
+    feature_aggregation: 'attention_pool_2d'
+    position_encording: 'sinusoidal'
+    downsample_ratio: 32
+    transforms:
+      - type: RandomCrop
+        ratio: 0.95
+    use_group_norm: True
+    share_rgb_model: False
+    imagenet_norm: True
+
+  num_inference_steps: 16
+  obs_as_global_cond: True
+  diffusion_step_embed_dim: 128
+  down_dims: [256, 512, 1024]
+  kernel_size: 5
+  n_groups: 8
+  cond_predict_scale: True
+  input_pertub: 0.1
+  train_diffusion_n_samples: 1
+
+ema:
+  _target_: diffusion_policy.model.diffusion.ema_model.EMAModel
+  update_after_step: 0
+  inv_gamma: 1.0
+  power: 0.75
+  min_value: 0.0
+  max_value: 0.9999
+
+dataloader:
+  batch_size: 64
+  num_workers: 8
+  shuffle: true
+  pin_memory: true
+  persistent_workers: True
+
+val_dataloader:
+  batch_size: 64
+  num_workers: 8
+  shuffle: False
+  pin_memory: true
+  persistent_workers: True
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-4
+  betas: [0.95, 0.999]
+  eps: 1.0e-8
+  weight_decay: 1.0e-6
+
+training:
+  device: "cuda:0"
+  seed: 0
+  debug: False
+  resume: True
+  lr_scheduler: cosine
+  lr_warmup_steps: 500
+  num_epochs: 300
+  gradient_accumulate_every: 1
+  use_ema: True
+  freeze_encoder: False
+  rollout_every: 500
+  checkpoint_every: 20
+  val_every: 1
+  sample_every: 10
+  max_train_steps: null
+  max_val_steps: null
+  tqdm_interval_sec: 1.0
+  allow_val_change: True
+
+logging:
+  project: UniT_TacArena
+  resume: True
+  mode: online
+  name: ${name}_${task_name}
+  tags: ["${name}", "${task_name}", "${exp_name}", "vqvae"]
+  id: null
+  group: null
+
+checkpoint:
+  topk:
+    monitor_key: train_loss
+    mode: min
+    k: 5
+    format_str: 'epoch={epoch:04d}-train_loss={train_loss:.3f}.ckpt'
+  save_last_ckpt: True
+  save_last_snapshot: False
+
+multi_run:
+  run_dir: outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  wandb_name_base: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
+
+hydra:
+  job:
+    override_dirname: ${name}
+  run:
+    dir: outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  sweep:
+    dir: outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+    subdir: ${hydra.job.num}
+

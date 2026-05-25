@@ -1,0 +1,117 @@
+name: train_t3_perception
+_target_: UniT.workspace.train_t3_perception_workspace.TrainT3PerceptionWorkspace
+dataset_path: &dataset_path data/3D_pose_gelsight
+horizon: &horizon 1
+
+task:
+  dataset:
+    _target_: UniT.dataset.tactile_perception_dataset.TactilePerceptionDataset
+    resized_image_shape: [224,224]
+    shape_meta:   
+      obs:    
+        tactile_image:
+          shape: [3, 240, 320]
+          type: rgb
+        3Dpose:
+          shape: [4]
+          type: low_dim
+    dataset_path: *dataset_path
+    horizon: *horizon
+    seed: 42
+    val_ratio: 0.1
+    max_train_episodes: null
+
+patch_size: 16
+encoder_embed_dim: 768
+encoder_heads: 12
+pooling: "none"
+encoder_depth: 3
+trunk_depth: 9
+model:
+  _target_: UniT.perception.t3_perception.T3Perception
+  encoder_path: t3dataset/models/t3_medium/encoders/mini.pth # please download the released models from T3 first
+  trunk_path: t3dataset/models/t3_medium/trunk.pth
+  encoder_embed_dim: ${encoder_embed_dim}
+  mini:
+    _target_: t3.models.ViTEncoder
+    patch_size: ${patch_size}
+    embed_dim: ${encoder_embed_dim}
+    depth: ${encoder_depth}
+    num_heads: ${encoder_heads}
+    mlp_ratio: 4. 
+  shared_trunk:
+    _target_: t3.models.TransformerTrunk
+    embed_dim: ${encoder_embed_dim}
+    depth: ${trunk_depth}
+    num_heads: ${encoder_heads}
+    mlp_ratio: 4.
+    pooling_type: ${pooling}
+  device: "cuda:0"
+  freeze_encoder: True
+
+dataloader:
+  batch_size: 128
+  num_workers: 8
+  shuffle: true
+  pin_memory: false
+  persistent_workers: False
+
+val_dataloader:
+  batch_size: 128
+  num_workers: 8
+  shuffle: False
+  pin_memory: false
+  persistent_workers: False
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-4
+  betas: [0.95, 0.999]
+  eps: 1.0e-8
+  weight_decay: 1.0e-6
+
+training:
+  device: "cuda:0"
+  seed: 42
+  resume: True
+  lr_scheduler: cosine
+  lr_warmup_steps: 500
+  num_epochs: 1000
+  gradient_accumulate_every: 1
+  checkpoint_every: 1
+  val_every: 10
+  max_train_steps: null
+  max_val_steps: null
+  tqdm_interval_sec: 1.0
+
+
+logging:
+  project: 3Dpose_benchmark
+  resume: True
+  mode: online
+  name: ${now:%Y.%m.%d-%H.%M.%S}_${name}
+  tags: ["${name}"]
+  id: null
+  group: null
+
+checkpoint:
+  topk:
+    monitor_key: train_loss
+    mode: min
+    k: 5
+    format_str: 'epoch={epoch:04d}-train_loss={train_loss:.3f}.ckpt'
+  save_last_ckpt: True
+  save_last_snapshot: False
+
+multi_run:
+  run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}
+  wandb_name_base: ${now:%Y.%m.%d-%H.%M.%S}_${name}
+
+hydra:
+  job:
+    override_dirname: ${name}
+  run:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}
+  sweep:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}
+    subdir: ${hydra.job.num}
