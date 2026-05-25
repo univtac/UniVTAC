@@ -340,10 +340,11 @@ class PreTrainedPolicy(nn.Module, HubMixin, abc.ABC):
             ValueError: If the configuration is invalid.
         """
         if not self.config.pretrained_path:
-            raise ValueError(
-                "Training from scratch using PEFT is unlikely to yield good results. "
-                "Supply a `policy.pretrained_path` to fine-tune an existing model."
-            )
+            # raise ValueError(
+            #     "Training from scratch using PEFT is unlikely to yield good results. "
+            #     "Supply a `policy.pretrained_path` to fine-tune an existing model."
+            # )
+            pass
 
     def _preprocess_peft_cli_overrides(self, cli_overrides: dict, peft_method_type) -> dict:
         """

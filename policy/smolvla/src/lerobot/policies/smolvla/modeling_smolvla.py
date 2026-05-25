@@ -572,7 +572,8 @@ class SmolVLAPolicy(PreTrainedPolicy):
 
     def _validate_peft_config(self, peft_config) -> None:
         """Validate PEFT configuration for SmolVLA."""
-        super()._validate_peft_config(peft_config)
+        if not self.config.pretrained_path:
+            super()._validate_peft_config(peft_config)
         if not self.config.load_vlm_weights:
             import logging
 

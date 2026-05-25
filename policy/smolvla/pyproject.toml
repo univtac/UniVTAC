@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lerobot"
-version = "0.1.0"
+version = "0.5.1"
 description = "LeRobot with SmolVLA visuo-tactile extensions"
 readme = { text = "LeRobot package vendored for UniVTAC SmolVLA experiments.", content-type = "text/plain" }
 requires-python = ">=3.12"
@@ -43,6 +43,8 @@ dependencies = [
     "wandb",
     "pyzmq",
     "transforms3d>=0.4.2",
+    "httpx[socks]>=0.28.1",
+    "num2words>=0.5.14",
 ]
 
 [project.optional-dependencies]

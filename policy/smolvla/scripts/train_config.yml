@@ -1,0 +1,13 @@
+policy:
+  type: smolvla
+  push_to_hub: false
+  use_tactile: true
+  tactile_fusion: token
+  load_vlm_weights: true
+  optimizer_lr: 1e-4
+
+peft:
+  method_type: lora
+
+batch_size: 8
+steps: 30000

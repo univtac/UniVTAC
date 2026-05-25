@@ -44,21 +44,21 @@ from lerobot.utils.constants import (
 )
 from lerobot.utils.feature_utils import dataset_to_policy_features
 
-from .act.configuration_act import ACTConfig
-from .diffusion.configuration_diffusion import DiffusionConfig
-from .eo1.configuration_eo1 import EO1Config
-from .gaussian_actor.configuration_gaussian_actor import GaussianActorConfig
-from .groot.configuration_groot import GrootConfig
-from .multi_task_dit.configuration_multi_task_dit import MultiTaskDiTConfig
-from .pi0.configuration_pi0 import PI0Config
-from .pi05.configuration_pi05 import PI05Config
+# from .act.configuration_act import ACTConfig
+# from .diffusion.configuration_diffusion import DiffusionConfig
+# from .eo1.configuration_eo1 import EO1Config
+# from .gaussian_actor.configuration_gaussian_actor import GaussianActorConfig
+# from .groot.configuration_groot import GrootConfig
+# from .multi_task_dit.configuration_multi_task_dit import MultiTaskDiTConfig
+# from .pi0.configuration_pi0 import PI0Config
+# from .pi05.configuration_pi05 import PI05Config
 from .pretrained import PreTrainedPolicy
 from .smolvla.configuration_smolvla import SmolVLAConfig
-from .tdmpc.configuration_tdmpc import TDMPCConfig
+# from .tdmpc.configuration_tdmpc import TDMPCConfig
 from .utils import validate_visual_features_consistency
-from .vqbet.configuration_vqbet import VQBeTConfig
-from .wall_x.configuration_wall_x import WallXConfig
-from .xvla.configuration_xvla import XVLAConfig
+# from .vqbet.configuration_vqbet import VQBeTConfig
+# from .wall_x.configuration_wall_x import WallXConfig
+# from .xvla.configuration_xvla import XVLAConfig
 
 
 def _reconnect_relative_absolute_steps(
@@ -95,62 +95,62 @@ def get_policy_class(name: str) -> type[PreTrainedPolicy]:
     Raises:
         NotImplementedError: If the policy name is not recognized.
     """
-    if name == "tdmpc":
-        from .tdmpc.modeling_tdmpc import TDMPCPolicy
+    # if name == "tdmpc":
+    #     from .tdmpc.modeling_tdmpc import TDMPCPolicy
 
-        return TDMPCPolicy
-    elif name == "diffusion":
-        from .diffusion.modeling_diffusion import DiffusionPolicy
+    #     return TDMPCPolicy
+    # elif name == "diffusion":
+    #     from .diffusion.modeling_diffusion import DiffusionPolicy
 
-        return DiffusionPolicy
-    elif name == "act":
-        from .act.modeling_act import ACTPolicy
+    #     return DiffusionPolicy
+    # elif name == "act":
+    #     from .act.modeling_act import ACTPolicy
 
-        return ACTPolicy
-    elif name == "multi_task_dit":
-        from .multi_task_dit.modeling_multi_task_dit import MultiTaskDiTPolicy
+    #     return ACTPolicy
+    # elif name == "multi_task_dit":
+    #     from .multi_task_dit.modeling_multi_task_dit import MultiTaskDiTPolicy
 
-        return MultiTaskDiTPolicy
-    elif name == "vqbet":
-        from .vqbet.modeling_vqbet import VQBeTPolicy
+    #     return MultiTaskDiTPolicy
+    # elif name == "vqbet":
+    #     from .vqbet.modeling_vqbet import VQBeTPolicy
 
-        return VQBeTPolicy
-    elif name == "pi0":
-        from .pi0.modeling_pi0 import PI0Policy
+    #     return VQBeTPolicy
+    # elif name == "pi0":
+    #     from .pi0.modeling_pi0 import PI0Policy
 
-        return PI0Policy
-    elif name == "pi0_fast":
-        from .pi0_fast.modeling_pi0_fast import PI0FastPolicy
+    #     return PI0Policy
+    # elif name == "pi0_fast":
+    #     from .pi0_fast.modeling_pi0_fast import PI0FastPolicy
 
-        return PI0FastPolicy
-    elif name == "pi05":
-        from .pi05.modeling_pi05 import PI05Policy
+    #     return PI0FastPolicy
+    # elif name == "pi05":
+    #     from .pi05.modeling_pi05 import PI05Policy
 
-        return PI05Policy
-    elif name == "gaussian_actor":
-        from .gaussian_actor.modeling_gaussian_actor import GaussianActorPolicy
+    #     return PI05Policy
+    # elif name == "gaussian_actor":
+    #     from .gaussian_actor.modeling_gaussian_actor import GaussianActorPolicy
 
-        return GaussianActorPolicy
-    elif name == "smolvla":
+    #     return GaussianActorPolicy
+    if name == "smolvla":
         from .smolvla.modeling_smolvla import SmolVLAPolicy
 
         return SmolVLAPolicy
-    elif name == "groot":
-        from .groot.modeling_groot import GrootPolicy
+    # elif name == "groot":
+    #     from .groot.modeling_groot import GrootPolicy
 
-        return GrootPolicy
-    elif name == "xvla":
-        from .xvla.modeling_xvla import XVLAPolicy
+    #     return GrootPolicy
+    # elif name == "xvla":
+    #     from .xvla.modeling_xvla import XVLAPolicy
 
-        return XVLAPolicy
-    elif name == "wall_x":
-        from .wall_x.modeling_wall_x import WallXPolicy
+    #     return XVLAPolicy
+    # elif name == "wall_x":
+    #     from .wall_x.modeling_wall_x import WallXPolicy
 
-        return WallXPolicy
-    elif name == "eo1":
-        from .eo1.modeling_eo1 import EO1Policy
+    #     return WallXPolicy
+    # elif name == "eo1":
+    #     from .eo1.modeling_eo1 import EO1Policy
 
-        return EO1Policy
+    #     return EO1Policy
     else:
         try:
             return _get_policy_cls_from_policy_name(name=name)
@@ -177,32 +177,32 @@ def make_policy_config(policy_type: str, **kwargs) -> PreTrainedConfig:
     Raises:
         ValueError: If the `policy_type` is not recognized.
     """
-    if policy_type == "tdmpc":
-        return TDMPCConfig(**kwargs)
-    elif policy_type == "diffusion":
-        return DiffusionConfig(**kwargs)
-    elif policy_type == "act":
-        return ACTConfig(**kwargs)
-    elif policy_type == "multi_task_dit":
-        return MultiTaskDiTConfig(**kwargs)
-    elif policy_type == "vqbet":
-        return VQBeTConfig(**kwargs)
-    elif policy_type == "pi0":
-        return PI0Config(**kwargs)
-    elif policy_type == "pi05":
-        return PI05Config(**kwargs)
-    elif policy_type == "gaussian_actor":
-        return GaussianActorConfig(**kwargs)
-    elif policy_type == "smolvla":
+    # if policy_type == "tdmpc":
+    #     return TDMPCConfig(**kwargs)
+    # elif policy_type == "diffusion":
+    #     return DiffusionConfig(**kwargs)
+    # elif policy_type == "act":
+    #     return ACTConfig(**kwargs)
+    # elif policy_type == "multi_task_dit":
+    #     return MultiTaskDiTConfig(**kwargs)
+    # elif policy_type == "vqbet":
+    #     return VQBeTConfig(**kwargs)
+    # elif policy_type == "pi0":
+    #     return PI0Config(**kwargs)
+    # elif policy_type == "pi05":
+    #     return PI05Config(**kwargs)
+    # elif policy_type == "gaussian_actor":
+    #     return GaussianActorConfig(**kwargs)
+    if policy_type == "smolvla":
         return SmolVLAConfig(**kwargs)
-    elif policy_type == "groot":
-        return GrootConfig(**kwargs)
-    elif policy_type == "xvla":
-        return XVLAConfig(**kwargs)
-    elif policy_type == "wall_x":
-        return WallXConfig(**kwargs)
-    elif policy_type == "eo1":
-        return EO1Config(**kwargs)
+    # elif policy_type == "groot":
+    #     return GrootConfig(**kwargs)
+    # elif policy_type == "xvla":
+    #     return XVLAConfig(**kwargs)
+    # elif policy_type == "wall_x":
+    #     return WallXConfig(**kwargs)
+    # elif policy_type == "eo1":
+    #     return EO1Config(**kwargs)
     else:
         try:
             config_cls = PreTrainedConfig.get_choice_class(policy_type)
@@ -265,25 +265,26 @@ def make_pre_post_processors(
     """
     if pretrained_path:
         # TODO(Steven): Temporary patch, implement correctly the processors for Gr00t
-        if isinstance(policy_cfg, GrootConfig):
-            # GROOT handles normalization in groot_pack_inputs_v3 step
-            # Need to override both stats AND normalize_min_max since saved config might be empty
-            preprocessor_overrides = {}
-            postprocessor_overrides = {}
-            preprocessor_overrides["groot_pack_inputs_v3"] = {
-                "stats": kwargs.get("dataset_stats"),
-                "normalize_min_max": True,
-            }
+        # if isinstance(policy_cfg, GrootConfig):
+        #     # GROOT handles normalization in groot_pack_inputs_v3 step
+        #     # Need to override both stats AND normalize_min_max since saved config might be empty
+        #     preprocessor_overrides = {}
+        #     postprocessor_overrides = {}
+        #     preprocessor_overrides["groot_pack_inputs_v3"] = {
+        #         "stats": kwargs.get("dataset_stats"),
+        #         "normalize_min_max": True,
+        #     }
 
-            # Also ensure postprocessing slices to env action dim and unnormalizes with dataset stats
-            env_action_dim = policy_cfg.output_features[ACTION].shape[0]
-            postprocessor_overrides["groot_action_unpack_unnormalize_v1"] = {
-                "stats": kwargs.get("dataset_stats"),
-                "normalize_min_max": True,
-                "env_action_dim": env_action_dim,
-            }
-            kwargs["preprocessor_overrides"] = preprocessor_overrides
-            kwargs["postprocessor_overrides"] = postprocessor_overrides
+        #     # Also ensure postprocessing slices to env action dim and unnormalizes with dataset stats
+        #     env_action_dim = policy_cfg.output_features[ACTION].shape[0]
+        #     postprocessor_overrides["groot_action_unpack_unnormalize_v1"] = {
+        #         "stats": kwargs.get("dataset_stats"),
+        #         "normalize_min_max": True,
+        #         "env_action_dim": env_action_dim,
+        #     }
+        #     kwargs["preprocessor_overrides"] = preprocessor_overrides
+        #     kwargs["postprocessor_overrides"] = postprocessor_overrides
+        pass
 
         preprocessor = PolicyProcessorPipeline.from_pretrained(
             pretrained_model_name_or_path=pretrained_path,
@@ -307,73 +308,73 @@ def make_pre_post_processors(
         return preprocessor, postprocessor
 
     # Create a new processor based on policy type
-    if isinstance(policy_cfg, TDMPCConfig):
-        from .tdmpc.processor_tdmpc import make_tdmpc_pre_post_processors
+    # if isinstance(policy_cfg, TDMPCConfig):
+    #     from .tdmpc.processor_tdmpc import make_tdmpc_pre_post_processors
 
-        processors = make_tdmpc_pre_post_processors(
-            config=policy_cfg,
-            dataset_stats=kwargs.get("dataset_stats"),
-        )
+    #     processors = make_tdmpc_pre_post_processors(
+    #         config=policy_cfg,
+    #         dataset_stats=kwargs.get("dataset_stats"),
+    #     )
 
-    elif isinstance(policy_cfg, DiffusionConfig):
-        from .diffusion.processor_diffusion import make_diffusion_pre_post_processors
+    # elif isinstance(policy_cfg, DiffusionConfig):
+    #     from .diffusion.processor_diffusion import make_diffusion_pre_post_processors
 
-        processors = make_diffusion_pre_post_processors(
-            config=policy_cfg,
-            dataset_stats=kwargs.get("dataset_stats"),
-        )
+    #     processors = make_diffusion_pre_post_processors(
+    #         config=policy_cfg,
+    #         dataset_stats=kwargs.get("dataset_stats"),
+    #     )
 
-    elif isinstance(policy_cfg, ACTConfig):
-        from .act.processor_act import make_act_pre_post_processors
+    # elif isinstance(policy_cfg, ACTConfig):
+    #     from .act.processor_act import make_act_pre_post_processors
 
-        processors = make_act_pre_post_processors(
-            config=policy_cfg,
-            dataset_stats=kwargs.get("dataset_stats"),
-        )
+    #     processors = make_act_pre_post_processors(
+    #         config=policy_cfg,
+    #         dataset_stats=kwargs.get("dataset_stats"),
+    #     )
 
-    elif isinstance(policy_cfg, MultiTaskDiTConfig):
-        from .multi_task_dit.processor_multi_task_dit import (
-            make_multi_task_dit_pre_post_processors,
-        )
+    # elif isinstance(policy_cfg, MultiTaskDiTConfig):
+    #     from .multi_task_dit.processor_multi_task_dit import (
+    #         make_multi_task_dit_pre_post_processors,
+    #     )
 
-        processors = make_multi_task_dit_pre_post_processors(
-            config=policy_cfg,
-            dataset_stats=kwargs.get("dataset_stats"),
-        )
+    #     processors = make_multi_task_dit_pre_post_processors(
+    #         config=policy_cfg,
+    #         dataset_stats=kwargs.get("dataset_stats"),
+    #     )
 
-    elif isinstance(policy_cfg, VQBeTConfig):
-        from .vqbet.processor_vqbet import make_vqbet_pre_post_processors
+    # elif isinstance(policy_cfg, VQBeTConfig):
+    #     from .vqbet.processor_vqbet import make_vqbet_pre_post_processors
 
-        processors = make_vqbet_pre_post_processors(
-            config=policy_cfg,
-            dataset_stats=kwargs.get("dataset_stats"),
-        )
+    #     processors = make_vqbet_pre_post_processors(
+    #         config=policy_cfg,
+    #         dataset_stats=kwargs.get("dataset_stats"),
+    #     )
 
-    elif isinstance(policy_cfg, PI0Config):
-        from .pi0.processor_pi0 import make_pi0_pre_post_processors
+    # elif isinstance(policy_cfg, PI0Config):
+    #     from .pi0.processor_pi0 import make_pi0_pre_post_processors
 
-        processors = make_pi0_pre_post_processors(
-            config=policy_cfg,
-            dataset_stats=kwargs.get("dataset_stats"),
-        )
+    #     processors = make_pi0_pre_post_processors(
+    #         config=policy_cfg,
+    #         dataset_stats=kwargs.get("dataset_stats"),
+    #     )
 
-    elif isinstance(policy_cfg, PI05Config):
-        from .pi05.processor_pi05 import make_pi05_pre_post_processors
+    # elif isinstance(policy_cfg, PI05Config):
+    #     from .pi05.processor_pi05 import make_pi05_pre_post_processors
 
-        processors = make_pi05_pre_post_processors(
-            config=policy_cfg,
-            dataset_stats=kwargs.get("dataset_stats"),
-        )
+    #     processors = make_pi05_pre_post_processors(
+    #         config=policy_cfg,
+    #         dataset_stats=kwargs.get("dataset_stats"),
+    #     )
 
-    elif isinstance(policy_cfg, GaussianActorConfig):
-        from .gaussian_actor.processor_gaussian_actor import make_gaussian_actor_pre_post_processors
+    # elif isinstance(policy_cfg, GaussianActorConfig):
+    #     from .gaussian_actor.processor_gaussian_actor import make_gaussian_actor_pre_post_processors
 
-        processors = make_gaussian_actor_pre_post_processors(
-            config=policy_cfg,
-            dataset_stats=kwargs.get("dataset_stats"),
-        )
+    #     processors = make_gaussian_actor_pre_post_processors(
+    #         config=policy_cfg,
+    #         dataset_stats=kwargs.get("dataset_stats"),
+    #     )
 
-    elif isinstance(policy_cfg, SmolVLAConfig):
+    if isinstance(policy_cfg, SmolVLAConfig):
         from .smolvla.processor_smolvla import make_smolvla_pre_post_processors
 
         processors = make_smolvla_pre_post_processors(
@@ -381,38 +382,38 @@ def make_pre_post_processors(
             dataset_stats=kwargs.get("dataset_stats"),
         )
 
-    elif isinstance(policy_cfg, GrootConfig):
-        from .groot.processor_groot import make_groot_pre_post_processors
+    # elif isinstance(policy_cfg, GrootConfig):
+    #     from .groot.processor_groot import make_groot_pre_post_processors
 
-        processors = make_groot_pre_post_processors(
-            config=policy_cfg,
-            dataset_stats=kwargs.get("dataset_stats"),
-        )
+    #     processors = make_groot_pre_post_processors(
+    #         config=policy_cfg,
+    #         dataset_stats=kwargs.get("dataset_stats"),
+    #     )
 
-    elif isinstance(policy_cfg, XVLAConfig):
-        from .xvla.processor_xvla import (
-            make_xvla_pre_post_processors,
-        )
+    # elif isinstance(policy_cfg, XVLAConfig):
+    #     from .xvla.processor_xvla import (
+    #         make_xvla_pre_post_processors,
+    #     )
 
-        processors = make_xvla_pre_post_processors(
-            config=policy_cfg,
-            dataset_stats=kwargs.get("dataset_stats"),
-        )
+    #     processors = make_xvla_pre_post_processors(
+    #         config=policy_cfg,
+    #         dataset_stats=kwargs.get("dataset_stats"),
+    #     )
 
-    elif isinstance(policy_cfg, WallXConfig):
-        from .wall_x.processor_wall_x import make_wall_x_pre_post_processors
+    # elif isinstance(policy_cfg, WallXConfig):
+    #     from .wall_x.processor_wall_x import make_wall_x_pre_post_processors
 
-        processors = make_wall_x_pre_post_processors(
-            config=policy_cfg,
-            dataset_stats=kwargs.get("dataset_stats"),
-        )
-    elif isinstance(policy_cfg, EO1Config):
-        from .eo1.processor_eo1 import make_eo1_pre_post_processors
+    #     processors = make_wall_x_pre_post_processors(
+    #         config=policy_cfg,
+    #         dataset_stats=kwargs.get("dataset_stats"),
+    #     )
+    # elif isinstance(policy_cfg, EO1Config):
+    #     from .eo1.processor_eo1 import make_eo1_pre_post_processors
 
-        processors = make_eo1_pre_post_processors(
-            config=policy_cfg,
-            dataset_stats=kwargs.get("dataset_stats"),
-        )
+    #     processors = make_eo1_pre_post_processors(
+    #         config=policy_cfg,
+    #         dataset_stats=kwargs.get("dataset_stats"),
+    #     )
 
     else:
         try:

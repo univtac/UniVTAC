@@ -1,2 +1,8 @@
+.vscode
+/build
+**/__pycache__/
+**/*.egg-info
+
 /data
 /.venv
+/uv.lock
