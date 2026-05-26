@@ -1,6 +1,0 @@
-# Basic experiment configuration
-policy_name: ACT_Modified
-seed: 0
-ckpt_setting: 50
-instruction_type: seen
-instuction_file: insert_hole

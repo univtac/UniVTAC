@@ -1,0 +1,6 @@
+policy_name: UniT
+seed: 0
+device: cpu
+ckpt_setting: 50
+instruction_type: seen
+instuction_file: null

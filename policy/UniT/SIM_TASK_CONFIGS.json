@@ -1,0 +1,12 @@
+{
+    "sim-grasp_classify-demo-2": {
+        "dataset_dir": "data/sim-grasp_classify/demo-2",
+        "num_episodes": 2,
+        "episode_len": 52,
+        "camera_names": [
+            "cam_head",
+            "tac_left",
+            "tac_right"
+        ]
+    }
+}

@@ -1,0 +1,195 @@
+name: diffusion_unit_policy
+_target_: UniT.workspace.train_diffusion_unet_image_workspace.TrainDiffusionUnetImageWorkspace
+
+dataset_path: data/sim-grasp_classify/demo-2
+horizon: 8
+n_obs_steps: 2
+n_action_steps: 4
+n_latency_steps: 0
+dataset_obs_steps: 2
+past_action_visible: false
+keypoint_visible_rate: 1.0
+obs_as_global_cond: true
+task_name: grasp_classify
+exp_name: tacarena_unit
+
+task:
+  dataset:
+    _target_: tacarena_dataset.TacArenaHdf5Dataset
+    shape_meta: &shape_meta
+      obs:
+        cam_high:
+          shape: [3, 224, 224]
+          type: rgb
+        tactile_right_image:
+          shape: [3, 128, 160]
+          type: rgb
+        tactile_left_image:
+          shape: [3, 128, 160]
+          type: rgb
+        qpos:
+          shape: [8]
+          type: low_dim
+      action:
+        shape: [8]
+    dataset_path: ${dataset_path}
+    horizon: ${horizon}
+    pad_before: 1
+    pad_after: 6
+    n_obs_steps: ${n_obs_steps}
+    n_latency_steps: 0
+    seed: 42
+    val_ratio: 0.0
+    max_train_episodes: null
+  env_runner:
+    _target_: dummy_env_runner.DummyImageRunner
+
+policy:
+  _target_: UniT.policy.diffusion_unit_policy.DiffusionUnitPolicy
+  obs_steps: ${n_obs_steps}
+  tactile: [left, right]
+  latent_shape: [3, 16, 20]
+  tactile_emb_dim: 64
+  vq_model_config:
+    embed_dim: 3
+    n_embed: 128
+    ckpt_path:
+    ddconfig:
+      double_z: false
+      z_channels: 3
+      resolution: 128
+      in_channels: 3
+      out_ch: 3
+      ch: 32
+      ch_mult: [1, 1, 2, 4]
+      num_res_blocks: 1
+      attn_resolutions: [16]
+      dropout: 0.0
+    lossconfig:
+      target: dummy_vq_loss.DummyVQLoss
+      params: {}
+  shape_meta:
+    obs:
+      cam_high:
+        shape: [3, 224, 224]
+        horizon: ${n_obs_steps}
+        type: rgb
+      qpos:
+        shape: [8]
+        horizon: ${n_obs_steps}
+        type: low_dim
+    action:
+      shape: [8]
+      horizon: ${horizon}
+  noise_scheduler:
+    _target_: diffusers.DDIMScheduler
+    num_train_timesteps: 16
+    beta_start: 0.0001
+    beta_end: 0.02
+    beta_schedule: squaredcos_cap_v2
+    clip_sample: true
+    set_alpha_to_one: true
+    steps_offset: 0
+    prediction_type: epsilon
+  obs_encoder:
+    _target_: UniT.model.vision.timm_obs_encoder.TimmObsEncoder
+    shape_meta:
+      obs:
+        cam_high:
+          shape: [3, 224, 224]
+          horizon: ${n_obs_steps}
+          type: rgb
+        qpos:
+          shape: [8]
+          horizon: ${n_obs_steps}
+          type: low_dim
+      action:
+        shape: [8]
+        horizon: ${horizon}
+    model_name: resnet18
+    pretrained: false
+    frozen: false
+    global_pool: ''
+    feature_aggregation: attention_pool_2d
+    position_encording: sinusoidal
+    downsample_ratio: 32
+    transforms:
+    use_group_norm: true
+    share_rgb_model: false
+    imagenet_norm: true
+  num_inference_steps: 4
+  obs_as_global_cond: true
+  diffusion_step_embed_dim: 64
+  down_dims: [128, 256]
+  kernel_size: 5
+  n_groups: 8
+  cond_predict_scale: true
+  input_pertub: 0.1
+  train_diffusion_n_samples: 1
+
+ema:
+  _target_: diffusion_policy.model.diffusion.ema_model.EMAModel
+  update_after_step: 0
+  inv_gamma: 1.0
+  power: 0.75
+  min_value: 0.0
+  max_value: 0.9999
+
+dataloader:
+  batch_size: 2
+  num_workers: 0
+  shuffle: true
+  pin_memory: false
+  persistent_workers: false
+
+val_dataloader:
+  batch_size: 2
+  num_workers: 0
+  shuffle: false
+  pin_memory: false
+  persistent_workers: false
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-4
+  betas: [0.95, 0.999]
+  eps: 1.0e-8
+  weight_decay: 1.0e-6
+
+training:
+  device: cuda:0
+  seed: 42
+  debug: false
+  resume: false
+  lr_scheduler: cosine
+  lr_warmup_steps: 1
+  num_epochs: 1
+  gradient_accumulate_every: 1
+  use_ema: true
+  freeze_encoder: false
+  rollout_every: 1000000
+  checkpoint_every: 1
+  val_every: 1
+  sample_every: 1
+  max_train_steps: 1
+  max_val_steps: 1
+  tqdm_interval_sec: 1.0
+  allow_val_change: true
+
+logging:
+  project: UniT_policy
+  resume: false
+  mode: disabled
+  name: ${name}_${task_name}
+  tags: ["${name}", "${task_name}", "${exp_name}"]
+  id:
+  group:
+
+checkpoint:
+  topk:
+    monitor_key: train_loss
+    mode: min
+    k: 1
+    format_str: 'epoch={epoch:04d}-train_loss={train_loss:.3f}.ckpt'
+  save_last_ckpt: true
+  save_last_snapshot: false
