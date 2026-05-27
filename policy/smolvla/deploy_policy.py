@@ -52,9 +52,9 @@ from .._base_policy import BasePolicy  # noqa: E402
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _to_chw_float(img):
+def _to_chw_float(img, image_scale: str = "raw"):
     """UniVTAC images are HWC uint8 0-255 torch tensors. Convert to CHW float
-    in [0, 1] which is what SmolVLA's pre-processor expects."""
+    while preserving the scale used by training unless explicitly requested."""
     import torch
 
     if not isinstance(img, torch.Tensor):
@@ -63,8 +63,10 @@ def _to_chw_float(img):
         raise ValueError(f"expected HWC tensor, got shape {tuple(img.shape)}")
     if img.dtype != torch.float32 and img.dtype != torch.float64:
         img = img.float()
-    if img.max() > 1.5:  # heuristic: still in 0-255 range
+    if image_scale == "float01" and img.max() > 1.5:
         img = img / 255.0
+    elif image_scale != "raw":
+        raise ValueError(f"unknown image_scale: {image_scale}")
     # HWC -> CHW
     return img.permute(2, 0, 1).contiguous()
 
@@ -141,9 +143,18 @@ class _SmolVLALocalPolicy(BasePolicy):
         sys.path.insert(0, str(_SMOLVLA_DIR / "src"))
         from huggingface_hub.constants import SAFETENSORS_SINGLE_FILE
         from lerobot.configs import PreTrainedConfig
+        from lerobot.processor import (
+            PolicyProcessorPipeline,
+            policy_action_to_transition,
+            transition_to_policy_action,
+        )
         from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
         from lerobot.policies.smolvla.processor_smolvla import (
             make_smolvla_pre_post_processors,
+        )
+        from lerobot.utils.constants import (
+            POLICY_POSTPROCESSOR_DEFAULT_NAME,
+            POLICY_PREPROCESSOR_DEFAULT_NAME,
         )
 
         # ------------------------------------------------------------------ env
@@ -154,9 +165,7 @@ class _SmolVLALocalPolicy(BasePolicy):
         # Checkpoint layout mirrors ACT:
         #   policy/smolvla/smolvla_ckpt/smolvla-<task_name>/<task_config>-<ep_num>/<train_config>/
         ckpt_dir = (
-            _SMOLVLA_DIR
-            / "outputs"
-            / f"smolvla_vitac_{args['task_name']}_demo_2_vitac"
+            _SMOLVLA_DIR / args.get('ckpt_root', 'outputs/smolvla_vitac_merged')
             / "checkpoints/last/pretrained_model"
         )
         ckpt_dir = Path(args.get("ckpt_dir", ckpt_dir))
@@ -181,10 +190,11 @@ class _SmolVLALocalPolicy(BasePolicy):
         self.device = torch.device(
             args.get("device", "cuda" if torch.cuda.is_available() else "cpu")
         )
-        self.image_size = tuple(cfg.get("smolvla_image_size", (224, 224)))
-        self.tactile_size = tuple(cfg.get("smolvla_tactile_size", (224, 224)))
+        self.image_size = cfg.get("smolvla_image_size")
+        self.tactile_size = cfg.get("smolvla_tactile_size")
+        self.image_scale = str(cfg.get("smolvla_image_scale", "raw"))
         self.n_action_steps = int(cfg.get("smolvla_n_action_steps", 0))  # 0 -> use config default
-        self.use_marker_variants = bool(cfg.get("smolvla_use_marker_variants", False))
+        self.use_marker_variants = cfg.get("smolvla_use_marker_variants", "auto")
 
         # ------------------------------------------------------------------ model + processors
         print(f"[smolvla] loading policy from {ckpt_dir}")
@@ -220,25 +230,50 @@ class _SmolVLALocalPolicy(BasePolicy):
             )
 
         self.model_config = _get_policy_config(self.model)
+        if self.image_size is None:
+            self.image_size = self._feature_hw(default=(256, 256), tactile=False)
+        if self.tactile_size is None:
+            self.tactile_size = self._feature_hw(default=self.image_size, tactile=True)
+        self.image_size = tuple(self.image_size)
+        self.tactile_size = tuple(self.tactile_size)
+
         if self.n_action_steps > 0:
             # Cap how many actions of the predicted chunk we actually execute.
             self.model_config.n_action_steps = min(
                 self.n_action_steps, self.model_config.chunk_size
             )
 
-        stats_path = Path(args.get(
-            "stats_path",
-            ckpt_dir / "meta" / "stats.json",
-        ))
-        dataset_stats = _load_stats(stats_path)
-        self.pre, self.post = make_smolvla_pre_post_processors(
-            self.model_config, dataset_stats=dataset_stats
-        )
+        preprocessor_config = ckpt_dir / f"{POLICY_PREPROCESSOR_DEFAULT_NAME}.json"
+        postprocessor_config = ckpt_dir / f"{POLICY_POSTPROCESSOR_DEFAULT_NAME}.json"
+        if preprocessor_config.exists() and postprocessor_config.exists():
+            self.pre = PolicyProcessorPipeline.from_pretrained(
+                ckpt_dir,
+                config_filename=preprocessor_config.name,
+                overrides={"device_processor": {"device": str(self.device)}},
+            )
+            self.post = PolicyProcessorPipeline.from_pretrained(
+                ckpt_dir,
+                config_filename=postprocessor_config.name,
+                to_transition=policy_action_to_transition,
+                to_output=transition_to_policy_action,
+            )
+        else:
+            stats_path = args.get("stats_path")
+            if stats_path is None:
+                stats_path = self._infer_dataset_stats_path(ckpt_dir)
+            dataset_stats = _load_stats(Path(stats_path) if stats_path is not None else None)
+            self.pre, self.post = make_smolvla_pre_post_processors(
+                self.model_config, dataset_stats=dataset_stats
+            )
 
         # ------------------------------------------------------------------ image mapping
         # Build the SmolVLA-key -> UniVTAC-path map dynamically so we only
         # encode the cameras the checkpoint actually expects.
         configured_keys = set(self.model_config.input_features.keys())
+        if self.use_marker_variants == "auto":
+            self.use_marker_variants = any(key.endswith("_marker") for key in configured_keys)
+        else:
+            self.use_marker_variants = bool(self.use_marker_variants)
         self._image_map: dict[str, tuple[str, str, str, bool]] = {}
         for batch_key, (root, cam, key, is_tactile) in self._DEFAULT_IMAGE_MAP.items():
             if batch_key not in configured_keys:
@@ -250,6 +285,30 @@ class _SmolVLALocalPolicy(BasePolicy):
 
         self._instruction_set = False
         self._cached_instruction: str | None = None
+
+    def _feature_hw(self, default: tuple[int, int], tactile: bool) -> tuple[int, int]:
+        for key, feature in self.model_config.input_features.items():
+            if tactile != ("tactile" in key):
+                continue
+            shape = tuple(getattr(feature, "shape", ()))
+            if len(shape) == 3:
+                return int(shape[-2]), int(shape[-1])
+        return default
+
+    def _infer_dataset_stats_path(self, ckpt_dir: Path) -> Path | None:
+        train_config_path = ckpt_dir / "train_config.json"
+        if train_config_path.exists():
+            with open(train_config_path, "r") as f:
+                train_config = json.load(f)
+            dataset_root = train_config.get("dataset", {}).get("root")
+            if dataset_root:
+                stats_path = Path(dataset_root) / "meta" / "stats.json"
+                if stats_path.exists():
+                    return stats_path
+        for candidate in (ckpt_dir / "meta" / "stats.json", ckpt_dir.parent / "meta" / "stats.json"):
+            if candidate.exists():
+                return candidate
+        return None
 
     # ----------------------------------------------------------------------
     # Observation encoding
@@ -295,7 +354,7 @@ class _SmolVLALocalPolicy(BasePolicy):
             if (not is_tactile) and self.camera_type != "all" and cam != self.camera_type:
                 continue
             img = self._pick_image(observation, root, cam, key)
-            img = _to_chw_float(img)
+            img = _to_chw_float(img, image_scale=self.image_scale)
             target = self.tactile_size if is_tactile else self.image_size
             img = _resize_chw(img, target)
             batch[batch_key] = img.to(self.device)

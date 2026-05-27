@@ -13,12 +13,19 @@ smolvla_n_action_steps: 50
 
 # Input image / tactile sizes. SmolVLA's own resize_imgs_with_padding kicks in
 # afterwards, so values here just standardize what we feed the processor.
-smolvla_image_size: [224, 224]
-smolvla_tactile_size: [224, 224]
+# Leave null to use the checkpoint input feature shape, typically [256, 256].
+smolvla_image_size: null
+smolvla_tactile_size: null
+
+# Training currently uses LeRobotDataset(return_uint8=True) with VISUAL
+# normalization set to IDENTITY, so model inputs are float tensors in 0-255.
+# Use "float01" only for checkpoints trained with images scaled to [0, 1].
+smolvla_image_scale: raw
 
 # Set to true if the trained checkpoint also used the marker-overlay tactile
 # streams (observation.images.tactile_ll_marker / tactile_lr_marker).
-smolvla_use_marker_variants: false
+# "auto" enables marker streams whenever they are present in checkpoint config.
+smolvla_use_marker_variants: auto
 
 # FastAPI inference service. By default Policy starts a local subprocess with
 # policy/smolvla/.venv/bin/python on a free localhost port. Set smolvla_port

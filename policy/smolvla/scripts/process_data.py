@@ -131,7 +131,7 @@ class SmolVLADataPreprocessor(BaseDataPreprocessor):
             axis=1,
         )
         action_all = np.asarray(self._data["embodiment/joint_action"], dtype=np.float32)
-        features = self._build_feature_schema(image_arrays, state_all.shape[1], action_all.shape[1])
+        features = self._build_feature_schema(image_arrays, state_all.shape[1], action_all.shape[1], use_videos)
 
         dataset = LeRobotDataset.create(
             repo_id=repo_id,
@@ -143,9 +143,8 @@ class SmolVLADataPreprocessor(BaseDataPreprocessor):
         )
 
         task_text = task_text or self._sample_instruction()
-        start_idx = 0
-        for ep_idx in tqdm(range(len(self.selected_raw_hdf5_paths)), desc="Writing LeRobot episodes"):
-            end_idx = self._data["episode_ends"][ep_idx]
+        episode_slices = self._episode_slices()
+        for ep_idx, start_idx, end_idx in tqdm(episode_slices, desc="Writing LeRobot episodes"):
             for frame_idx in range(start_idx, end_idx):
                 frame = {
                     "observation.state": state_all[frame_idx],
@@ -156,7 +155,6 @@ class SmolVLADataPreprocessor(BaseDataPreprocessor):
                     frame[key] = images[frame_idx]
                 dataset.add_frame(frame)
             dataset.save_episode()
-            start_idx = end_idx
 
         dataset.finalize()
         self.save_root_path = dataset.root
@@ -166,6 +164,15 @@ class SmolVLADataPreprocessor(BaseDataPreprocessor):
             "num_episodes": len(self.selected_raw_hdf5_paths),
             "camera_names": list(image_arrays.keys()),
             "episode_map": {i: str(path) for i, path in enumerate(self.selected_raw_hdf5_paths)},
+            "episode_slices": {
+                i: {
+                    "source": str(self.selected_raw_hdf5_paths[i]),
+                    "start": int(start),
+                    "end": int(end),
+                    "length": int(end - start),
+                }
+                for i, start, end in episode_slices
+            },
         }
         with open(dataset.root / "source_metadata.json", "w") as f:
             json.dump(metadata, f, indent=4)
@@ -183,6 +190,7 @@ class SmolVLADataPreprocessor(BaseDataPreprocessor):
         episode_num=50,
         random_select=False,
         overwrite=True,
+        use_videos: bool = True,
     ) -> dict:
         self.load_data(
             visual_cameras=visual_cameras,
@@ -197,6 +205,7 @@ class SmolVLADataPreprocessor(BaseDataPreprocessor):
             fps=fps,
             task_text=task_text,
             overwrite=overwrite,
+            use_videos=use_videos,
         )
 
     def visual_transform(self, images: np.ndarray) -> np.ndarray:
@@ -234,13 +243,33 @@ class SmolVLADataPreprocessor(BaseDataPreprocessor):
             images[marker_key] = np.asarray(self._data[self._tactile_stream_keys[cam]["rgb_marker"]], dtype=np.uint8)
         return images
 
+    def _episode_slices(self) -> list[tuple[int, int, int]]:
+        episode_ends = np.asarray(self._data["episode_ends"], dtype=np.int64)
+        if len(episode_ends) != len(self.selected_raw_hdf5_paths):
+            raise ValueError(
+                "HDF5Handler returned episode_ends with length "
+                f"{len(episode_ends)}, but {len(self.selected_raw_hdf5_paths)} source HDF5 files were selected."
+            )
+
+        slices: list[tuple[int, int, int]] = []
+        start_idx = 0
+        for ep_idx, end_idx in enumerate(episode_ends):
+            end = int(end_idx)
+            if end <= start_idx:
+                raise ValueError(f"Invalid episode slice for episode {ep_idx}: start={start_idx}, end={end}")
+            slices.append((ep_idx, start_idx, end))
+            start_idx = end
+        return slices
+
     @staticmethod
-    def _build_feature_schema(image_arrays: dict[str, np.ndarray], state_dim: int, action_dim: int) -> dict:
+    def _build_feature_schema(
+        image_arrays: dict[str, np.ndarray], state_dim: int, action_dim: int, use_videos: bool
+    ) -> dict:
         features: dict = {}
         for key, images in image_arrays.items():
             h, w = images.shape[1], images.shape[2]
             features[key] = {
-                "dtype": "video",
+                "dtype": "video" if use_videos else "image",
                 "shape": (3, int(h), int(w)),
                 "names": ["channel", "height", "width"],
                 "info": None,
@@ -281,6 +310,9 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--task", type=str, default=None, help="Task description string.")
     p.add_argument("--downsample-factor", type=int, default=1)
     p.add_argument("--no-overwrite", action="store_true")
+    storage = p.add_mutually_exclusive_group()
+    storage.add_argument("--images", action="store_true", help="Store visual modalities as image files. This is the default.")
+    storage.add_argument("--videos", action="store_true", help="Store visual modalities as MP4 videos instead of image files.")
     return p.parse_args()
 
 
@@ -288,8 +320,10 @@ def main() -> None:
     args = _parse_args()
     if args.task_name is None or args.task_config is None or args.expert_data_num is None:
         raise SystemExit("Provide positional: task_name task_config expert_data_num")
-    repo_id = args.repo_id or f"local/{args.task_name}-{args.task_config}-{args.expert_data_num}_vitac"
-    out_root = args.out or (SMOLVLA_ROOT / "data" / f"{args.task_name}_{args.task_config}_{args.expert_data_num}_lerobot")
+
+    settings = f"{args.task_name}-{args.task_config}-{args.expert_data_num}"
+    repo_id = args.repo_id or f"local/{settings}_vitac"
+    out_root = args.out or (SMOLVLA_ROOT / "data" / repo_id)
     processor = SmolVLADataPreprocessor(args.task_name, args.task_config)
     metadata = processor.run(
         repo_id=repo_id,
@@ -299,6 +333,7 @@ def main() -> None:
         downsample_factor=args.downsample_factor,
         episode_num=args.expert_data_num,
         overwrite=not args.no_overwrite,
+        use_videos=args.videos,
     )
 
     log.info("LeRobot repo_id: %s", metadata["repo_id"])
