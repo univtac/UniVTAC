@@ -19,3 +19,12 @@ smolvla_tactile_size: [224, 224]
 # Set to true if the trained checkpoint also used the marker-overlay tactile
 # streams (observation.images.tactile_ll_marker / tactile_lr_marker).
 smolvla_use_marker_variants: false
+
+# FastAPI inference service. By default Policy starts a local subprocess with
+# policy/smolvla/.venv/bin/python on a free localhost port. Set smolvla_port
+# to connect to an already-running service instead.
+# smolvla_python: policy/smolvla/.venv/bin/python
+# smolvla_host: 127.0.0.1
+smolvla_port: 10700
+# smolvla_startup_timeout: 300
+# smolvla_request_timeout: 300

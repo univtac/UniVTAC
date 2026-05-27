@@ -12,3 +12,6 @@ peft:
 
 batch_size: 8
 steps: 30000
+log_freq: 10
+# eval_freq: 10
+# save_freq: 10

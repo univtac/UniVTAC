@@ -19,11 +19,12 @@ TASK_CONFIG="${TASK_CONFIG:-demo}"
 EXPERT_DATA_NUM="${EXPERT_DATA_NUM:-2}"
 
 export TASK_SETTINGS="${TASK_NAME}_${TASK_CONFIG}_${EXPERT_DATA_NUM}"
-export REPO_ID="local/${TASK_SETTINGS}_vitac"
-export DATASET_ROOT="${REPO_ROOT}/data/${REPO_ID}"
+export REPO_ID="${REPO_ID:-local/${TASK_SETTINGS}_vitac}"
+export DATASET_ROOT="${DATASET_ROOT:-${REPO_ROOT}/data/${REPO_ID}}"
 
-OUTPUT_DIR="${OUTPUT_DIR:-${REPO_ROOT}/outputs/smolvla_vitac_${TASK_SETTINGS}}"
-JOB_NAME="${JOB_NAME:-smolvla_vitac_${TASK_SETTINGS}}"
+RUN_TAG="${RUN_TAG:-${REPO_ID##*/}}"
+OUTPUT_DIR="${OUTPUT_DIR:-${REPO_ROOT}/outputs/smolvla_vitac_${RUN_TAG}}"
+JOB_NAME="${JOB_NAME:-smolvla_vitac_${RUN_TAG}}"
 
 # Distributed launch (works for single-GPU, multi-GPU, and multi-node).
 NUM_GPUS="${NUM_GPUS:-1}"
