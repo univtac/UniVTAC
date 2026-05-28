@@ -33,8 +33,10 @@ from lerobot.processor import (  # noqa: E402
 )
 from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy  # noqa: E402
 from lerobot.policies.smolvla.processor_smolvla import make_smolvla_pre_post_processors  # noqa: E402
+from lerobot.utils.random_utils import set_seed  # noqa: E402
 from lerobot.utils.constants import (  # noqa: E402
     ACTION,
+    OBS_PREFIX,
     POLICY_POSTPROCESSOR_DEFAULT_NAME,
     POLICY_PREPROCESSOR_DEFAULT_NAME,
 )
@@ -104,6 +106,14 @@ def _load_model(ckpt_dir: Path, device: str):
                 config=policy_config,
             )
         else:
+            train_config_path = ckpt_dir / "train_config.json"
+            if train_config_path.exists():
+                seed = _load_json(train_config_path).get("seed")
+                if seed is not None:
+                    print(f"[eval_traj] setting seed {seed} before reconstructing PEFT base model")
+                    set_seed(int(seed))
+            else:
+                print("[eval_traj] warning: PEFT adapter has no base_model_name_or_path and no train_config.json")
             model = SmolVLAPolicy(policy_config)
         model = PeftModel.from_pretrained(
             model,
@@ -161,6 +171,45 @@ def _to_model_frame(item: dict, config, image_scale: str) -> dict:
     return frame
 
 
+def _delta_timestamps(config, fps: int) -> dict[str, list[float]] | None:
+    delta_timestamps = {}
+    if config.action_delta_indices is not None:
+        delta_timestamps[ACTION] = [i / fps for i in config.action_delta_indices]
+    if config.observation_delta_indices is not None:
+        for key in config.input_features:
+            if key.startswith(OBS_PREFIX):
+                delta_timestamps[key] = [i / fps for i in config.observation_delta_indices]
+    return delta_timestamps or None
+
+
+def _dataset_fps(dataset_root: Path) -> int:
+    info_path = dataset_root / "meta" / "info.json"
+    if info_path.exists():
+        return int(_load_json(info_path)["fps"])
+    return 30
+
+
+def _as_training_item(item: dict) -> dict:
+    """Keep the raw action chunk; batch rank is fixed after preprocessor."""
+    item = dict(item)
+    return item
+
+
+def _fix_training_batch_rank(batch: dict) -> dict:
+    """Add batch rank for action chunks after the normalizer step.
+
+    LeRobot's AddBatchDimensionActionStep only unsqueezes 1D single-step
+    actions. SmolVLA training uses action chunks shaped (B, T, D), but a
+    single dataset item is (T, D), so we must add B=1 manually.
+    """
+    if ACTION in batch and isinstance(batch[ACTION], torch.Tensor) and batch[ACTION].ndim == 2:
+        batch[ACTION] = batch[ACTION].unsqueeze(0)
+    pad_key = f"{ACTION}_is_pad"
+    if pad_key in batch and isinstance(batch[pad_key], torch.Tensor) and batch[pad_key].ndim == 1:
+        batch[pad_key] = batch[pad_key].unsqueeze(0)
+    return batch
+
+
 def _episode_list(value: str | None) -> list[int] | None:
     if not value:
         return None
@@ -184,6 +233,17 @@ def parse_args() -> argparse.Namespace:
         default="raw",
         help="'raw' mirrors LeRobot training batches; 'float01' mirrors deploy_policy image scaling.",
     )
+    parser.add_argument(
+        "--action-mode",
+        choices=("queued", "first"),
+        default="queued",
+        help="'queued' mirrors deploy action chunk execution; 'first' resets per frame and compares the first predicted action.",
+    )
+    parser.add_argument(
+        "--compute-train-loss",
+        action="store_true",
+        help="Also compute model.forward() loss using action chunks and the checkpoint processor.",
+    )
     parser.add_argument("--csv", type=Path, default=None, help="Optional per-frame metrics output.")
     return parser.parse_args()
 
@@ -202,19 +262,23 @@ def main() -> None:
     print(f"[eval_traj] repo_id:    {repo_id}")
     print(f"[eval_traj] device:     {args.device}")
     print(f"[eval_traj] image_scale:{args.image_scale}")
+    print(f"[eval_traj] action_mode:{args.action_mode}")
 
+    model, config = _load_model(ckpt_dir, args.device)
+    delta_timestamps = _delta_timestamps(config, _dataset_fps(dataset_root)) if args.compute_train_loss else None
     dataset = LeRobotDataset(
         repo_id,
         root=dataset_root,
         episodes=episodes,
+        delta_timestamps=delta_timestamps,
         return_uint8=True,
     )
-    model, config = _load_model(ckpt_dir, args.device)
     pre, post = _load_processors(ckpt_dir, config, args.device, dataset.meta.stats)
 
     rows = []
     l2_values = []
     mse_values = []
+    train_loss_values = []
     previous_episode = None
     total = min(len(dataset), args.max_frames) if args.max_frames is not None else len(dataset)
 
@@ -225,9 +289,29 @@ def main() -> None:
             _reset_model(model)
             previous_episode = episode
 
-        target = item[ACTION].detach().cpu().float().reshape(-1)
+        action_item = item[ACTION]
+        target_action = action_item[0] if action_item.ndim == 2 else action_item
+        target = target_action.detach().cpu().float().reshape(-1)
         batch = _to_model_frame(item, config, args.image_scale)
         processed = pre(batch)
+
+        train_loss = None
+        if args.compute_train_loss:
+            training_item = _as_training_item(item)
+            training_batch = _to_model_frame(training_item, config, args.image_scale)
+            training_batch[ACTION] = training_item[ACTION]
+            pad_key = f"{ACTION}_is_pad"
+            if pad_key in training_item:
+                training_batch[pad_key] = training_item[pad_key]
+            training_processed = pre(training_batch)
+            training_processed = _fix_training_batch_rank(training_processed)
+            with torch.no_grad():
+                loss, loss_dict = model(training_processed)
+            train_loss = float(loss.detach().cpu().item())
+            train_loss_values.append(train_loss)
+
+        if args.action_mode == "first":
+            _reset_model(model)
 
         with torch.no_grad():
             pred = model.select_action(processed)
@@ -247,6 +331,7 @@ def main() -> None:
                 "frame_index": int(item["frame_index"].item()),
                 "l2": l2,
                 "mse": mse,
+                "train_loss": train_loss,
                 "pred": pred.tolist(),
                 "target": target.tolist(),
             }
@@ -257,7 +342,7 @@ def main() -> None:
         with open(args.csv, "w", newline="") as f:
             writer = csv.DictWriter(
                 f,
-                fieldnames=["index", "episode_index", "frame_index", "l2", "mse", "pred", "target"],
+                fieldnames=["index", "episode_index", "frame_index", "l2", "mse", "train_loss", "pred", "target"],
             )
             writer.writeheader()
             writer.writerows(rows)
@@ -268,6 +353,9 @@ def main() -> None:
     print(f"  median_l2:   {float(np.median(l2_values)) if l2_values else float('nan'):.6f}")
     print(f"  mean_mse:    {float(np.mean(mse_values)) if mse_values else float('nan'):.6f}")
     print(f"  median_mse:  {float(np.median(mse_values)) if mse_values else float('nan'):.6f}")
+    if train_loss_values:
+        print(f"  mean_train_loss:   {float(np.mean(train_loss_values)):.6f}")
+        print(f"  median_train_loss: {float(np.median(train_loss_values)):.6f}")
     if args.csv is not None:
         print(f"  csv:         {args.csv}")
 

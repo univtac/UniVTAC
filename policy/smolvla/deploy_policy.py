@@ -7,16 +7,16 @@ as :class:`policy.ACT.deploy_policy.Policy`:
 
 * ``__init__(args)``  -- load checkpoint + processors, read deploy.yml-ish args.
 * ``encode_obs(obs)`` -- convert UniVTAC observation -> SmolVLA batch dict.
-* ``eval(task, obs)`` -- run a single env step (encode -> select_action -> take_action).
-* ``reset()``         -- drop the SmolVLA action queue and re-arm language.
+* ``eval(task, obs)`` -- run a single env step (encode -> chunk inference -> take_action).
+* ``reset()``         -- drop temporal aggregation state and re-arm language.
 
 SmolVLA differs from ACT in two ways the deploy code has to handle:
 
 1.  It needs a language instruction; we tokenize once per episode via the
     standard SmolVLA pre-processor pipeline.
-2.  It returns *chunks* of actions, but :meth:`SmolVLAPolicy.select_action`
-    already takes care of the queue so we can keep the per-step ACT-style
-    loop.
+2.  It returns *chunks* of actions. At deploy time we re-run chunk inference
+    every step and aggregate overlapping predictions with exponential weights,
+    matching the ACT-style temporal aggregation used elsewhere in UniVTAC.
 
 A LeRobot v3.0 dataset stats file (``meta/stats.json``) is optional but
 *strongly* recommended at deploy time; without it the normalizer falls
@@ -152,6 +152,7 @@ class _SmolVLALocalPolicy(BasePolicy):
         from lerobot.policies.smolvla.processor_smolvla import (
             make_smolvla_pre_post_processors,
         )
+        from lerobot.utils.random_utils import set_seed
         from lerobot.utils.constants import (
             POLICY_POSTPROCESSOR_DEFAULT_NAME,
             POLICY_PREPROCESSOR_DEFAULT_NAME,
@@ -195,6 +196,9 @@ class _SmolVLALocalPolicy(BasePolicy):
         self.image_scale = str(cfg.get("smolvla_image_scale", "raw"))
         self.n_action_steps = int(cfg.get("smolvla_n_action_steps", 0))  # 0 -> use config default
         self.use_marker_variants = cfg.get("smolvla_use_marker_variants", "auto")
+        self.temporal_agg_max_timesteps = int(cfg.get("smolvla_temporal_agg_max_timesteps", 1000))
+        self.temporal_agg_action_dim = int(cfg.get("smolvla_temporal_agg_action_dim", 9))
+        self.temporal_agg_k = float(cfg.get("smolvla_temporal_agg_k", 0.01))
 
         # ------------------------------------------------------------------ model + processors
         print(f"[smolvla] loading policy from {ckpt_dir}")
@@ -216,6 +220,15 @@ class _SmolVLALocalPolicy(BasePolicy):
                     config=policy_config,
                 )
             else:
+                train_config_path = ckpt_dir / "train_config.json"
+                if train_config_path.exists():
+                    with open(train_config_path, "r") as f:
+                        seed = json.load(f).get("seed")
+                    if seed is not None:
+                        print(f"[smolvla] setting seed {seed} before reconstructing PEFT base model")
+                        set_seed(int(seed))
+                else:
+                    print("[smolvla] warning: PEFT adapter has no base_model_name_or_path and no train_config.json")
                 self.model = SmolVLAPolicy(policy_config)
 
             self.model = PeftModel.from_pretrained(
@@ -285,6 +298,68 @@ class _SmolVLALocalPolicy(BasePolicy):
 
         self._instruction_set = False
         self._cached_instruction: str | None = None
+        self._reset_temporal_aggregation()
+
+    def _reset_temporal_aggregation(self) -> None:
+        import torch
+
+        self.t = 0
+        self.all_time_actions = torch.zeros(
+            (
+                self.temporal_agg_max_timesteps,
+                self.temporal_agg_max_timesteps,
+                self.temporal_agg_action_dim,
+            ),
+            device=self.device,
+            dtype=torch.float32,
+        )
+        self.all_time_actions_populated = torch.zeros(
+            (
+                self.temporal_agg_max_timesteps,
+                self.temporal_agg_max_timesteps,
+            ),
+            device=self.device,
+            dtype=torch.bool,
+        )
+
+    def _aggregate_action_chunk(self, action_chunk) -> np.ndarray:
+        import torch
+
+        action_chunk = torch.as_tensor(action_chunk, device=self.device, dtype=torch.float32)
+        if action_chunk.ndim == 3:
+            action_chunk = action_chunk[0]
+        if action_chunk.ndim != 2:
+            raise ValueError(f"expected action chunk shaped (T, D) or (1, T, D), got {tuple(action_chunk.shape)}")
+
+        if action_chunk.shape[-1] != self.temporal_agg_action_dim:
+            raise ValueError(
+                "SmolVLA action dim does not match temporal aggregation buffer: "
+                f"chunk has {action_chunk.shape[-1]}, buffer has {self.temporal_agg_action_dim}"
+            )
+        if self.t >= self.temporal_agg_max_timesteps:
+            raise RuntimeError(
+                f"SmolVLA temporal aggregation buffer exhausted at step {self.t}; "
+                f"increase smolvla_temporal_agg_max_timesteps above {self.temporal_agg_max_timesteps}"
+            )
+
+        chunk_len = min(action_chunk.shape[0], self.temporal_agg_max_timesteps - self.t)
+        end = self.t + chunk_len
+        self.all_time_actions[self.t, self.t:end] = action_chunk[:chunk_len]
+        self.all_time_actions_populated[self.t, self.t:end] = True
+
+        populated = self.all_time_actions_populated[:, self.t]
+        actions_for_curr_step = self.all_time_actions[populated, self.t]
+        if actions_for_curr_step.numel() == 0:
+            raise RuntimeError(f"no SmolVLA action predictions available for step {self.t}")
+
+        weights = torch.exp(
+            -self.temporal_agg_k
+            * torch.arange(actions_for_curr_step.shape[0], device=self.device, dtype=torch.float32)
+        )
+        weights = weights / weights.sum()
+        action = (actions_for_curr_step * weights.unsqueeze(1)).sum(dim=0)
+        self.t += 1
+        return action.detach().cpu().numpy()
 
     def _feature_hw(self, default: tuple[int, int], tactile: bool) -> tuple[int, int]:
         for key, feature in self.model_config.input_features.items():
@@ -375,10 +450,8 @@ class _SmolVLALocalPolicy(BasePolicy):
         """Run a single env step with SmolVLA and dispatch the action.
 
         Mirrors :meth:`policy.ACT.deploy_policy.Policy.eval` so the harness
-        treats SmolVLA identically to ACT. We use
-        :meth:`SmolVLAPolicy.select_action` which internally maintains an
-        action chunk queue and only re-runs the heavy VLA forward pass when
-        the queue is empty.
+        treats SmolVLA identically to ACT. We run chunk inference every step
+        and aggregate overlapping predictions with exponential weights.
         """
         import torch
 
@@ -395,13 +468,10 @@ class _SmolVLALocalPolicy(BasePolicy):
         batch = self.pre(batch)
 
         with torch.no_grad():
-            action = self.model.select_action(batch)  # (1, action_dim) on CPU after post
+            action_chunk = self.model.predict_action_chunk(batch)
 
-        action = self.post(action)
-        if isinstance(action, torch.Tensor):
-            action_np = action.detach().cpu().reshape(-1).numpy()
-        else:
-            action_np = np.asarray(action).reshape(-1)
+        action_chunk = self.post(action_chunk)
+        action_np = self._aggregate_action_chunk(action_chunk)
 
         action_t = torch.from_numpy(action_np).to(task.device).float()
         # SmolVLA action is the next-step joint pose; UniVTAC uses 'qpos' for joint targets.
@@ -422,17 +492,16 @@ class _SmolVLALocalPolicy(BasePolicy):
         batch = self.pre(batch)
 
         with torch.no_grad():
-            action = self.model.select_action(batch)
+            action_chunk = self.model.predict_action_chunk(batch)
 
-        action = self.post(action)
-        if isinstance(action, torch.Tensor):
-            return action.detach().cpu().reshape(-1).numpy()
-        return np.asarray(action).reshape(-1)
+        action_chunk = self.post(action_chunk)
+        return self._aggregate_action_chunk(action_chunk)
 
     def reset(self):
         """Reset SmolVLA's internal action queue and clear cached instruction."""
         self._instruction_set = False
         self._cached_instruction = None
+        self._reset_temporal_aggregation()
         if hasattr(self.model, "reset"):
             self.model.reset()
 
