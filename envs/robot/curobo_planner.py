@@ -4,6 +4,7 @@ import transforms3d as t3d
 from curobo.types.robot import JointState
 from curobo.util.usd_helper import UsdHelper, WorldConfig
 from curobo.types.math import Pose as CuroboPose
+from curobo.geom.types import Mesh
 from curobo.geom.sdf.world import CollisionCheckerType
 from curobo.wrap.reacher.motion_gen import (
     MotionGen,
@@ -87,11 +88,14 @@ class CuroboPlanner:
     def get_curr_world_cfg(self):
         obstacles = self.usd_helper.get_obstacles_from_stage(
             reference_prim_path='/World/envs/env_0/Robot',
-            ignore_paths=[
-                '/World/visualize',
-                '/World/envs/env_0/Robot',
-            ]
+            only_paths=[
+                '/World/envs/env_0/ground_plate'
+            ],
         ).get_collision_check_world()
+
+        for name, actor in self.task._actor_manager.actors.items():
+            mesh = Mesh.from_pointcloud(actor.vertices, pitch=0.005, name=name)
+            obstacles.add_obstacle(mesh)
         return obstacles
 
     def update_world(self):
