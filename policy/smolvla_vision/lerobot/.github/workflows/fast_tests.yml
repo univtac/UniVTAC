@@ -1,0 +1,128 @@
+# Copyright 2025 The HuggingFace Inc. team. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This workflow validates each optional-dependency tier in isolation.
+# Each tier installs a different extra and runs the full test suite.
+# Tests that require an extra not installed in the current tier are
+# skipped automatically via pytest.importorskip guards.
+name: Fast Tests
+
+on:
+  # Allows running this workflow manually from the Actions tab
+  workflow_dispatch:
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Makefile"
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Makefile"
+
+permissions:
+  contents: read
+
+# Sets up the environment variables
+env:
+  UV_VERSION: "0.8.0"
+  PYTHON_VERSION: "3.12"
+
+# Ensures that only the latest commit for a PR or branch is built, canceling older runs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  # This job runs pytests in isolated dependency tiers.
+  # Each tier installs a different extra and runs the full suite;
+  # tests gated behind other extras skip automatically.
+  fast-pytest-tests:
+    name: Fast Pytest Tests
+    runs-on: ubuntu-latest
+    env:
+      MUJOCO_GL: egl
+      HF_HOME: /mnt/cache/.cache/huggingface
+      HF_LEROBOT_HOME: /mnt/cache/.cache/huggingface/lerobot
+      HF_USER_TOKEN: ${{ secrets.LEROBOT_HF_USER }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+          lfs: true
+
+      # NOTE(Steven): Mount to `/mnt` to avoid the limited storage on `/home`. Consider cleaning default SDKs or using self-hosted runners for more space.
+      # (As of 2024-06-10, the runner's `/home` has only 6.2 GB free—8% of its 72 GB total.)
+      - name: Setup /mnt storage
+        run: sudo chown -R $USER:$USER /mnt
+
+      # TODO(Steven): Evaluate the need of these dependencies
+      - name: Install apt dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y build-essential git \
+          curl libglib2.0-0 libegl1-mesa-dev ffmpeg \
+          libusb-1.0-0-dev speech-dispatcher libgeos-dev portaudio19-dev
+
+      - name: Setup uv and Python
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6
+        with:
+          enable-cache: true
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # ── Tier 1: Base ──────────────────────────────────────
+      - name: "Tier 1 — Install: base"
+        run: uv sync --locked --extra test
+
+      - name: Login to Hugging Face
+        if: env.HF_USER_TOKEN != ''
+        run: |
+          uv run hf auth login --token "$HF_USER_TOKEN" --add-to-git-credential
+          uv run hf auth whoami
+
+      - name: "Tier 1 — Test: base"
+        run: uv run pytest tests -vv --maxfail=10
+
+      # ── Tier 2: Dataset ──────────────────────────────────
+      - name: "Tier 2 — Install: dataset"
+        run: uv sync --locked --extra test --extra dataset
+
+      - name: "Tier 2 — Test: dataset"
+        run: uv run pytest tests -vv --maxfail=10
+
+      # ── Tier 3: Hardware ─────────────────────────────────
+      - name: "Tier 3 — Install: hardware"
+        run: uv sync --locked --extra test --extra hardware
+
+      - name: "Tier 3 — Test: hardware"
+        run: uv run pytest tests -vv --maxfail=10
+
+      # ── Tier 4: Viz ──────────────────────────────────────
+      - name: "Tier 4 — Install: viz"
+        run: uv sync --locked --extra test --extra viz
+
+      - name: "Tier 4 — Test: viz"
+        run: uv run pytest tests -vv --maxfail=10

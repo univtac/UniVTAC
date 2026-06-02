@@ -1,0 +1,94 @@
+# Copyright 2024 The HuggingFace Inc. team. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: "🚀 Issue / Bug / Request"
+description: Report a bug, suggest an improvement, or ask a technical question.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Thanks for contributing to LeRobot! 🙌
+        Please choose the most relevant sections below. If this is a general "how-to" question, consider our [Discord](https://discord.gg/s3KuuzsPFb) for faster community support.
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Ticket Type
+      description: What kind of ticket are you opening?
+      options:
+        - "🐛 Bug Report (Something isn't working)"
+        - "💡 Feature Request / Improvement"
+        - "❓ Technical Question"
+        - "🧹 Maintenance / Documentation"
+    validations:
+      required: true
+
+  - type: textarea
+    id: system-info
+    attributes:
+      label: Environment & System Info
+      description: |
+        For bugs or technical questions, please run `lerobot-info` and paste the output.
+        (Optional for feature requests).
+      render: Shell
+      placeholder: lerobot version, OS, python version, etc.
+
+  - type: textarea
+    id: description
+    validations:
+      required: true
+    attributes:
+      label: Description
+      description: |
+        Provide a clear summary of the issue or your proposal.
+        - **Bugs:** What is happening?
+        - **Features:** What is the goal/use case?
+        - **Questions:** What are you trying to achieve?
+      placeholder: |
+        A clear and concise description of the issue or suggestion.
+
+  - type: textarea
+    id: context-repro
+    attributes:
+      label: Context & Reproduction
+      description: |
+        Provide a code snippet, steps to reproduce a bug, or technical details about your proposal.
+        Please use code blocks for scripts and CLI commands.
+      placeholder: |
+        Steps to reproduce / Usage example:
+        1.
+        2.
+        3.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or stack trace
+      description: If applicable, paste relevant error logs here.
+      render: Shell
+
+  - type: checkboxes
+    id: extras
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing tickets to ensure this isn't a duplicate.
+        - label: I am using the latest version of the `main` branch.
+        - label: I have verified this is not an environment-specific problem.
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Additional Info / Workarounds
+      description: Anything else we should know? If you have a workaround, please share it!
