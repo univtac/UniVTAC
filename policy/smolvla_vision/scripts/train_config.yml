@@ -1,0 +1,24 @@
+dataset:
+  repo_id: local/lift_bottle_demo_2_vision
+  root: null
+  return_uint8: true
+  use_imagenet_stats: true
+
+policy:
+  type: smolvla
+  push_to_hub: false
+  load_vlm_weights: true
+  optimizer_lr: 1e-4
+  scheduler_warmup_steps: 100
+  scheduler_decay_steps: 1000
+
+batch_size: 8
+steps: 1
+log_freq: 10
+save_freq: 1000
+eval_freq: 0
+num_workers: 4
+use_policy_training_preset: true
+
+wandb:
+  enable: false
