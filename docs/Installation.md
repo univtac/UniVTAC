@@ -24,7 +24,11 @@ conda create -n UniVTAC python=3.10 -y
 conda activate UniVTAC
 ```
 
-### Step 3: Install TacEx (Modified Source)
+### Step 3: Install cuRobo
+
+cuRobo is used for GPU-accelerated collision-aware motion planning. Follow the official [cuRobo Installation Guide](https://curobo.org/get_started/1_install_instructions.html).
+
+### Step 4: Install TacEx (Modified Source)
 
 > **Important:** Do **not** install TacEx from the public repository. UniVTAC requires a modified version of TacEx that is bundled in `third_party/TacEx`. Some internal APIs have been adapted for UniVTAC's tactile sensor pipeline.
 
@@ -141,12 +145,8 @@ pip install -e source/tacex_uipc -v
 ```
 > You can also install all TacEx packages with `./tacex.sh -i all`.
 
-**3.** Verify that the `tacex_uipc` works by running an example:
+**3.** Verify that the `tacex_uipc` works by running a data collection example:
 
 ```bash
-python ./scripts/benchmarking/tactile_sim_performance/run_ball_rolling_experiment.py --num_envs 1 --debug_vis --env uipc
+bash collect_data.sh grasp_classify demo 0
 ```
-
-### Step 4: Install cuRobo
-
-cuRobo is used for GPU-accelerated collision-aware motion planning. Follow the official [cuRobo Installation Guide](https://curobo.org/get_started/1_install_instructions.html).

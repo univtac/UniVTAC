@@ -12,6 +12,9 @@ assets/objects/OrangeBlock*
 assets/objects/textures
 assets/objects/.thumbs
 
+assets/textures/*
+!assets/textures/Cherry*
+
 replay
 traj*
 

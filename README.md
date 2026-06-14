@@ -25,6 +25,8 @@ UniVTAC currently includes the following manipulation tasks, all featuring tacti
 | **Put Bottle in Shelf** | `put_bottle_in_shelf` | Place a bottle onto a shelf |
 | **Grasp & Classify** | `grasp_classify` | Grasp an object and classify it by tactile feedback |
 
+To build more tasks, refer to the [Task Creation Guide](./docs/TaskCreation.md) for instructions on how to define new manipulation tasks within the UniVTAC framework.
+
 ## Data Collection
 
 See the [Data Collection Guide](./docs/Collection.md) for instructions on how to run the automated data collection pipeline, configure task-specific parameters, and understand the output data structure.
