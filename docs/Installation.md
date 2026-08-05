@@ -1,6 +1,18 @@
 # Installation Guide
 
-## Requirements
+## Installation all-in-one Script
+
+Clone the repository and run the installation script `scripts/install.sh` to set up the environment and install dependencies all at once. The script will create a conda environment named `UniVTAC` and install Isaac Sim, Isaac Lab, TacEx, cuRobo, and other necessary packages.
+
+```bash
+git clone https://github.com/univtac/UniVTAC.git
+cd UniVTAC
+bash scripts/install.sh
+```
+
+## Manual Installation Instructions
+
+### Requirements
 
 - System: Linux with NVIDIA GPU
 - Python 3.10
@@ -8,27 +20,27 @@
 - [NVIDIA cuRobo](https://curobo.org)
 - [TacEx](https://github.com/DH-Ng/TacEx): **Must be built from the local `third_party/TacEx` source** (contains project-specific modifications)
 
-## Installation & Setup
+### Installation & Setup
 
-### Step 1: Clone the Repository
+#### Step 1: Clone the Repository
 
 ```bash
 git clone https://github.com/univtac/UniVTAC.git
 cd UniVTAC
 ```
 
-### Step 2: Create a Conda Environment
+#### Step 2: Create a Conda Environment
 
 ```bash
 conda create -n UniVTAC python=3.10 -y
 conda activate UniVTAC
 ```
 
-### Step 3: Install cuRobo
+#### Step 3: Install cuRobo
 
 cuRobo is used for GPU-accelerated collision-aware motion planning. Follow the official [cuRobo Installation Guide](https://curobo.org/get_started/1_install_instructions.html).
 
-### Step 4: Install TacEx (Modified Source)
+#### Step 4: Install TacEx (Modified Source)
 
 > **Important:** Do **not** install TacEx from the public repository. UniVTAC requires a modified version of TacEx that is bundled in `third_party/TacEx`. Some internal APIs have been adapted for UniVTAC's tactile sensor pipeline.
 
@@ -44,7 +56,7 @@ If you have a working Isaac Lab environment, you can directly install TacEx. Oth
 > [!note]
 > To install Isaac Sim for Ubuntu 20.04 follow the [binary installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/binaries_installation.html).
 
-#### Isaac Sim - Linux pip installation
+##### Isaac Sim - Linux pip installation
 
 ```bash
 # install cuda-enabled pytorch
@@ -56,7 +68,7 @@ pip install 'isaacsim[all,extscache]==4.5.0' --extra-index-url https://pypi.nvid
 
 > verify that the Isaac Sim installation works by calling `isaacsim` in the terminal
 
-#### Isaac Lab
+###### Isaac Lab
 
 ```bash
 # install dependencies via apt (Ubuntu)
@@ -80,7 +92,7 @@ python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ant-v0 --head
 
 </details>
 
-#### Installing TacEx [Core]
+##### Installing TacEx [Core]
 
 **1.** Activate the Isaac Env
 ```bash
@@ -107,7 +119,7 @@ python ./scripts/reinforcement_learning/skrl/train.py --task TacEx-Ball-Rolling-
 ```
 > You can view the sensor output in the IsaacLab Tab: `Scene Debug Visualization > Observations > sensor_output`
 
-#### Installing TacEx [UIPC]
+##### Installing TacEx [UIPC]
 The `tacex_uipc` package is responsible for the [UIPC](https://spirimirror.github.io/libuipc-doc/) simulation in TacEx.
 
 **1.** Install the [libuipc dependencies](https://spirimirror.github.io/libuipc-doc/build_install/linux/):
