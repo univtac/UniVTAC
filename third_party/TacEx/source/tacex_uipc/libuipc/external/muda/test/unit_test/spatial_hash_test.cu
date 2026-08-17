@@ -1,7 +1,7 @@
 #include <catch2/catch.hpp>
 #include <muda/muda.h>
 #include <muda/container.h>
-#include <muda/ext/geo/spatial_hash.h>
+#include <muda/ext/spatial_hash.h>
 
 using namespace muda;
 using namespace muda::spatial_hash;

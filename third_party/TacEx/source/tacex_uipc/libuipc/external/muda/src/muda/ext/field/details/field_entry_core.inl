@@ -51,6 +51,7 @@ MUDA_INLINE MUDA_GENERIC std::byte* FieldEntryCore::elem_addr(int i) const
         }
     }
     MUDA_KERNEL_ERROR_WITH_LOCATION("invalid layout: %d", static_cast<int>(layout()));
+    return nullptr;
 }
 
 

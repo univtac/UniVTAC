@@ -419,7 +419,6 @@ class TaximTorch(torch.nn.Module, TaximImpl[torch.Tensor, torch.device]):
         """
         # gaussian filtering with square kernel
         f0_blurred = self.__gaussian_blur(f0, self.sim_params.initial_frame_sigma(f0.shape[1:]))
-
         # Checking the difference between original and filtered image
         d_i = torch.mean(f0_blurred - f0, dim=0)
 

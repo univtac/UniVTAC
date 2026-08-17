@@ -5,6 +5,10 @@
 #include <uipc/core/internal/scene.h>
 #include <uipc/core/scene_snapshot.h>
 
+// local include
+// for default_scene_config, to_config_json, from_config_json
+#include "scene_default_config.h"
+
 namespace uipc::core
 {
 // ----------------------------------------------------------------------------
@@ -12,91 +16,14 @@ namespace uipc::core
 // ----------------------------------------------------------------------------
 Json Scene::default_config() noexcept
 {
-    Json config;
-    config["dt"]      = 0.01;
-    config["gravity"] = Vector3{0.0, -9.8, 0.0};
-
-
-    config["cfl"]["enable"] = false;
-
-    auto& integrator = config["integrator"];
-    {
-        integrator["type"] = "bdf1"; // bdf1
-    }
-
-    auto& newton = config["newton"];
-    {
-        newton["max_iter"] = 1024;
-
-        newton["use_adaptive_tol"] = false;
-
-        // convergence tolerance
-        // 1) max dx <= velocity_tol * dt
-        newton["velocity_tol"] = 0.05_m / 1.0_s;
-        // 2) ccd_toi >= ccd_tol
-        newton["ccd_tol"] = 1.0;
-        // 3) max dF <=  dF <= transform_tol * dt
-        newton["transrate_tol"] = 0.1 / 1.0_s;  // 10%/s change in transform
-    }
-
-    auto& linear_system = config["linear_system"];
-    {
-        linear_system["tol_rate"] = 1e-3;
-        linear_system["solver"]   = "linear_pcg";
-    }
-
-    auto& line_search = config["line_search"];
-    {
-        line_search["max_iter"]      = 8;
-        line_search["report_energy"] = false;
-    }
-
-    auto& contact = config["contact"];
-    {
-        contact["enable"]             = true;
-        contact["friction"]["enable"] = true;
-        contact["constitution"]       = "ipc";
-        contact["d_hat"]              = 0.01;
-        contact["eps_velocity"]       = 0.01_m / 1.0_s;
-    }
-
-    auto& collision_detection = config["collision_detection"];
-    {
-        collision_detection["method"] = "linear_bvh";
-    }
-
-    auto& sanity_check = config["sanity_check"];
-    {
-        sanity_check["enable"] = true;
-
-        // normal: automatically export mesh to workspace
-        // quiet: do not export mesh
-        sanity_check["mode"] = "normal";
-    }
-
-    auto& recovery = config["recovery"] = Json::object();
-    {
-        // now just empty
-    }
-
-    auto& diff_sim = config["diff_sim"] = Json::object();
-    {
-        diff_sim["enable"] = false;
-    }
-
-    // something that is unofficial
-    auto& extras = config["extras"] = Json::object();
-    {
-        extras["debug"]["dump_surface"] = false;
-        extras["strict_mode"]["enable"] = false;
-    }
-
-    return config;
+    return to_config_json(default_scene_config());
 }
 
-Scene::Scene(const Json& config)
-    : m_internal(uipc::make_shared<internal::Scene>(config))
+Scene::Scene(const Json& j)
 {
+    geometry::AttributeCollection config = default_scene_config();
+    from_config_json(config, j);
+    m_internal = uipc::make_shared<internal::Scene>(config);
 }
 
 Scene::Scene(S<internal::Scene> scene) noexcept
@@ -104,9 +31,14 @@ Scene::Scene(S<internal::Scene> scene) noexcept
 {
 }
 
-const Json& Scene::config() const noexcept
+Scene::CConfigAttributes Scene::config() const noexcept
 {
-    return m_internal->config();
+    return CConfigAttributes{m_internal->config()};
+}
+
+Scene::ConfigAttributes Scene::config() noexcept
+{
+    return ConfigAttributes{m_internal->config()};
 }
 
 Scene::~Scene() = default;
@@ -119,6 +51,16 @@ ContactTabular& Scene::contact_tabular() noexcept
 const ContactTabular& Scene::contact_tabular() const noexcept
 {
     return m_internal->contact_tabular();
+}
+
+SubsceneTabular& Scene::subscene_tabular() noexcept
+{
+    return m_internal->subscene_tabular();
+}
+
+const SubsceneTabular& Scene::subscene_tabular() const noexcept
+{
+    return m_internal->subscene_tabular();
 }
 
 ConstitutionTabular& Scene::constitution_tabular() noexcept
@@ -150,11 +92,6 @@ auto Scene::geometries() const noexcept -> CGeometries
     return CGeometries{*m_internal};
 }
 
-const Json& Scene::info() const noexcept
-{
-    return m_internal->config();
-}
-
 Animator& Scene::animator()
 {
     return m_internal->animator();
@@ -168,23 +105,15 @@ const Animator& Scene::animator() const
 DiffSim& Scene::diff_sim()
 {
     // automatically enable diff_sim
-    m_internal->config()["diff_sim"]["enable"] = true;
+    auto diff_sim_enable = m_internal->config().find<IndexT>("diff_sim/enable");
+    UIPC_ASSERT(diff_sim_enable, "Scene config must have a 'diff_sim/enable' attribute.");
+    geometry::view(*diff_sim_enable)[0] = 1;
     return m_internal->diff_sim();
 }
 
 const DiffSim& Scene::diff_sim() const
 {
     return m_internal->diff_sim();
-}
-
-SanityChecker& Scene::sanity_checker()
-{
-    return m_internal->sanity_checker();
-}
-
-const SanityChecker& Scene::sanity_checker() const
-{
-    return m_internal->sanity_checker();
 }
 
 void Scene::update_from(const SceneSnapshotCommit& snapshot)
@@ -308,7 +237,8 @@ namespace fmt
 appender fmt::formatter<uipc::core::Scene>::format(const uipc::core::Scene& c,
                                                    format_context& ctx) const
 {
-    fmt::format_to(ctx.out(), "{}", c.m_internal->objects());
+    fmt::format_to(ctx.out(), "config:\n{}", c.m_internal->config());
+    fmt::format_to(ctx.out(), "\n{}", c.m_internal->objects());
     fmt::format_to(ctx.out(), "\n{}", c.m_internal->animator());
     return ctx.out();
 }

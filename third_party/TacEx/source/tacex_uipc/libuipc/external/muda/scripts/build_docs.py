@@ -11,7 +11,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     muda_doc_dir = args.output
     print(f'output_dir={muda_doc_default_dir}')
-    config_file = muda_project_dir / 'mkdocs.yaml'
+    config_file = muda_project_dir / 'mkdocs-with-api.yaml'
     print(f'config_file={config_file}')
     Value = sp.call(['mkdocs', 'build', '-f', config_file, '-d', muda_doc_dir])
     if Value == 0:

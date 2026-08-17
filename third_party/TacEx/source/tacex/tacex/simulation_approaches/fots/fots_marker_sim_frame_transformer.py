@@ -334,7 +334,7 @@ class FOTSMarkerFrameTransformerSimulator(GelSightSimulator):
         #     )
         #     cv2.circle(frame, (center_x, center_y), 6, color, 1, lineType=8)
 
-        frame = cv2.normalize(frame, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        # frame = cv2.normalize(frame, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
         # frame = frame[:self.cfg.tactile_img_res[1], :self.cfg.tactile_img_res[0]]
         return frame
 

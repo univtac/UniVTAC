@@ -11,6 +11,8 @@
 #include <uipc/common/map.h>
 #include <uipc/geometry/utils/distance.h>
 #include <uipc/geometry/utils/octree.h>
+#include <primtive_contact.h>
+
 namespace std
 {
 // Vector2i  set comparison
@@ -50,8 +52,8 @@ class SimplicialSurfaceDistanceCheck final : public SanityChecker
   protected:
     virtual void build(backend::SceneVisitor& scene) override
     {
-        auto enable_contact = scene.info()["contact"]["enable"].get<bool>();
-        if(!enable_contact)
+        auto enable_contact = scene.config().find<IndexT>("contact/enable");
+        if(!enable_contact->view()[0])
         {
             throw SanityCheckerException("Contact is not enabled");
         }
@@ -155,12 +157,11 @@ class SimplicialSurfaceDistanceCheck final : public SanityChecker
     {
         auto context = find<Context>();
 
-        auto d_hat = scene.info()["contact"]["d_hat"].get<Float>();
-
         const geometry::SimplicialComplex& scene_surface =
             context->scene_simplicial_surface();
 
-        const ContactTabular& contact_tabular = context->contact_tabular();
+        auto& contact_tabular  = context->contact_tabular();
+        auto& subscene_tabular = context->subscene_tabular();
 
         auto Vs = scene_surface.vertices().size() ? scene_surface.positions().view() :
                                                     span<const Vector3>{};
@@ -182,26 +183,48 @@ class SimplicialSurfaceDistanceCheck final : public SanityChecker
         UIPC_ASSERT(attr_cids, "`sanity_check/contact_element_id` is not found in scene surface");
         auto CIds = attr_cids->view();
 
+        auto attr_scids = scene_surface.vertices().find<IndexT>(
+            "sanity_check/subscene_contact_element_id");
+        UIPC_ASSERT(attr_scids, "`sanity_check/subscene_contact_element_id` is not found in scene surface");
+        auto SCIds = attr_scids->view();
+
         auto attr_v_geo_ids =
             scene_surface.vertices().find<IndexT>("sanity_check/geometry_id");
         UIPC_ASSERT(attr_v_geo_ids, "`sanity_check/geometry_id` is not found in scene surface");
         auto VGeoIds = attr_v_geo_ids->view();
+
+        auto attr_v_instance_id =
+            scene_surface.vertices().find<IndexT>("sanity_check/instance_id");
+        UIPC_ASSERT(attr_v_instance_id,
+                    "`sanity_check/instance_id` is not found in scene surface");
+        auto VInstanceIds = attr_v_instance_id->view();
 
         auto attr_v_object_id =
             scene_surface.vertices().find<IndexT>("sanity_check/object_id");
         UIPC_ASSERT(attr_v_object_id, "`sanity_check/object_id` is not found in scene surface");
         auto VObjectIds = attr_v_object_id->view();
 
+        auto attr_self_collision =
+            scene_surface.vertices().find<IndexT>("sanity_check/self_collision");
+        UIPC_ASSERT(attr_self_collision,
+                    "`sanity_check/self_collision` is not found in scene surface");
+        auto SelfCollision = attr_self_collision->view();
+
         auto attr_v_thickness = scene_surface.vertices().find<Float>(builtin::thickness);
         auto VThickness =
             attr_v_thickness ? attr_v_thickness->view() : span<const Float>{};
 
+        auto attr_v_d_hat = scene_surface.vertices().find<Float>("sanity_check/d_hat");
+        UIPC_ASSERT(attr_v_d_hat, "`sanity_check/d_hat` is not found in scene surface");
+        auto Vd_hats = attr_v_d_hat->view();
 
         vector<geometry::BVH::AABB> codim_point_aabbs(CodimPs.size());
         for(auto [i, p] : enumerate(CodimPs))
         {
             auto thickness = VThickness.empty() ? 0 : VThickness[p];
-            auto extend    = Vector3::Constant(thickness + d_hat);
+            auto expansion = point_dcd_expansion(Vd_hats[p]);
+            auto extend    = Vector3::Constant(thickness + expansion);
+
             codim_point_aabbs[i].extend(Vs[p] - extend).extend(Vs[p] + extend);
         }
 
@@ -209,7 +232,9 @@ class SimplicialSurfaceDistanceCheck final : public SanityChecker
         for(auto [i, v] : enumerate(Vs))
         {
             auto thickness = VThickness.empty() ? 0 : VThickness[i];
-            auto extend    = Vector3::Constant(thickness + d_hat);
+            auto expansion = point_dcd_expansion(Vd_hats[i]);
+            auto extend    = Vector3::Constant(thickness + expansion);
+
             point_aabbs[i].extend(v - extend).extend(v + extend);
         }
 
@@ -218,7 +243,10 @@ class SimplicialSurfaceDistanceCheck final : public SanityChecker
         {
             auto thickness =
                 VThickness.empty() ? 0 : VThickness[e[0]] + VThickness[e[1]];
-            auto extend = Vector3::Constant(thickness + d_hat);
+
+            auto expansion = edge_dcd_expansion(Vd_hats[e[0]], Vd_hats[e[1]]);  // average d_hat of two vertices
+
+            auto extend = Vector3::Constant(thickness + expansion);
             edge_aabbs[i]
                 .extend(Vs[e[0]] - extend)
                 .extend(Vs[e[0]] + extend)
@@ -232,7 +260,11 @@ class SimplicialSurfaceDistanceCheck final : public SanityChecker
             auto thickness = VThickness.empty() ?
                                  0 :
                                  VThickness[f[0]] + VThickness[f[1]] + VThickness[f[2]];
-            auto extend    = Vector3::Constant(thickness + d_hat);
+
+            auto expansion =
+                triangle_dcd_expansion(Vd_hats[f[0]], Vd_hats[f[1]], Vd_hats[f[2]]);  // average d_hat of three vertices
+
+            auto extend = Vector3::Constant(thickness + expansion);
             tri_aabbs[i]
                 .extend(Vs[f[0]] - extend)
                 .extend(Vs[f[0]] + extend)
@@ -291,10 +323,22 @@ class SimplicialSurfaceDistanceCheck final : public SanityChecker
                 auto L = CIds[CodimP];
                 auto R = CIds[P];
 
-                const core::ContactModel& model = contact_table.at(L, R);
+                auto SL = SCIds[CodimP];
+                auto SR = SCIds[P];
 
-                // 2) if the contact model is not enabled, don't consider it
-                if(!model.is_enabled())
+                // 2) if this is a self-collision
+                if(VInstanceIds[CodimP] == VInstanceIds[P])
+                {
+                    // if self-collision is not enabled, skip it
+                    if(!SelfCollision[CodimP])
+                        return;
+                }
+
+                // 3) if the contact model is not enabled, don't consider it
+                if(!need_contact(subscene_tabular, SL, SR))
+                    return;
+
+                if(!need_contact(contact_table, L, R))
                     return;
 
                 Float D = geometry::point_point_squared_distance(Vs[CodimP], Vs[P]);
@@ -330,13 +374,31 @@ class SimplicialSurfaceDistanceCheck final : public SanityChecker
                 if(CodimP == E[0] || CodimP == E[1])
                     return;
 
-                auto L = CIds[CodimP];
-                auto R = CIds[E[0]];
+                // 2) if this is a self-collision
+                UIPC_ASSERT(VInstanceIds[E[0]] == VInstanceIds[E[1]],
+                            "Why Edge({},{}) is not in the same instance?",
+                            E[0],
+                            E[1]);
 
-                const core::ContactModel& model = contact_table.at(L, R);
+                if(VInstanceIds[CodimP] == VInstanceIds[E[0]])
+                {
+                    // if self-collision is not enabled, skip it
+                    if(!SelfCollision[CodimP])
+                        return;
+                }
+
+                auto     CIdL  = CIds[CodimP];
+                Vector2i CIdRs = {CIds[E[0]], CIds[E[1]]};
+
+                auto     SCIdL  = SCIds[CodimP];
+                Vector2i SCIdRs = {SCIds[E[0]], SCIds[E[1]]};
+
 
                 // 2) if the contact model is not enabled, don't consider it
-                if(!model.is_enabled())
+                if(!need_contact(subscene_tabular, SCIdL, SCIdRs))
+                    return;
+
+                if(!need_contact(contact_table, CIdL, CIdRs))
                     return;
 
                 Float D =
@@ -365,53 +427,71 @@ class SimplicialSurfaceDistanceCheck final : public SanityChecker
             });
 
         // 3) AllP-AllT
-        tri_bvh.query(point_aabbs,
-                      [&](IndexT i, IndexT j)
-                      {
-                          IndexT   P = i;
-                          Vector3i T = Fs[j];
+        tri_bvh.query(
+            point_aabbs,
+            [&](IndexT i, IndexT j)
+            {
+                IndexT   P = i;
+                Vector3i T = Fs[j];
 
-                          // 1) if the point is on the triangle, don't consider it
-                          if(P == T[0] || P == T[1] || P == T[2])
-                              return;
+                // 1) if the point is on the triangle, don't consider it
+                if(P == T[0] || P == T[1] || P == T[2])
+                    return;
 
-                          auto L = CIds[P];
-                          auto R = CIds[T[0]];
+                auto     CIdL  = CIds[P];
+                Vector3i CIdRs = {CIds[T[0]], CIds[T[1]], CIds[T[2]]};
 
-                          const core::ContactModel& model = contact_table.at(L, R);
+                auto     SCIdL  = SCIds[P];
+                Vector3i SCIdRs = {SCIds[T[0]], SCIds[T[1]], SCIds[T[2]]};
 
-                          // 2) if the contact model is not enabled, don't consider it
-                          if(!model.is_enabled())
-                              return;
+                // 2) if this is a self-collision
+                UIPC_ASSERT(VInstanceIds[T[0]] == VInstanceIds[T[1]]
+                                && VInstanceIds[T[1]] == VInstanceIds[T[2]],
+                            "Why Triangle({},{},{}) is not in the same instance?",
+                            T[0],
+                            T[1],
+                            T[2]);
+                if(VInstanceIds[P] == VInstanceIds[T[0]])
+                {
+                    // if self-collision is not enabled, skip it
+                    if(!SelfCollision[P])
+                        return;
+                }
 
-                          Float D = geometry::point_triangle_squared_distance(
-                              Vs[P], Vs[T[0]], Vs[T[1]], Vs[T[2]]);
+                // 3) if the contact model is not enabled, don't consider it
+                if(!need_contact(subscene_tabular, SCIdL, SCIdRs))
+                    return;
 
-                          Float thickness = VThickness.empty() ?
-                                                0 :
-                                                VThickness[P] + VThickness[T[0]];
+                if(!need_contact(contact_table, CIdL, CIdRs))
+                    return;
 
-                          Float thickness2 = thickness * thickness;
+                Float D = geometry::point_triangle_squared_distance(
+                    Vs[P], Vs[T[0]], Vs[T[1]], Vs[T[2]]);
 
-                          if(D <= thickness2)
-                          {
-                              vertex_too_close[P] = 1;
-                              tri_too_close[j]    = 1;
+                Float thickness =
+                    VThickness.empty() ? 0 : VThickness[P] + VThickness[T[0]];
 
-                              // also mark the vertices of the triangle
-                              vertex_too_close[T[0]] = 1;
-                              vertex_too_close[T[1]] = 1;
-                              vertex_too_close[T[2]] = 1;
+                Float thickness2 = thickness * thickness;
 
-                              is_too_close = true;
+                if(D <= thickness2)
+                {
+                    vertex_too_close[P] = 1;
+                    tri_too_close[j]    = 1;
 
-                              Vector2i geo_ids{VGeoIds[P], VGeoIds[T[0]]};
+                    // also mark the vertices of the triangle
+                    vertex_too_close[T[0]] = 1;
+                    vertex_too_close[T[1]] = 1;
+                    vertex_too_close[T[2]] = 1;
 
-                              close_geo_ids[geo_ids] = {VObjectIds[P], VObjectIds[T[0]]};
+                    is_too_close = true;
 
-                              set_geo_distance(geo_ids, D, thickness2);
-                          }
-                      });
+                    Vector2i geo_ids{VGeoIds[P], VGeoIds[T[0]]};
+
+                    close_geo_ids[geo_ids] = {VObjectIds[P], VObjectIds[T[0]]};
+
+                    set_geo_distance(geo_ids, D, thickness2);
+                }
+            });
 
         // 4) AllE-AllE
         edge_bvh.query(
@@ -425,13 +505,35 @@ class SimplicialSurfaceDistanceCheck final : public SanityChecker
                 if(E0[0] == E1[0] || E0[0] == E1[1] || E0[1] == E1[0] || E0[1] == E1[1])
                     return;
 
-                auto L = CIds[E0[0]];
-                auto R = CIds[E1[0]];
+                Vector2i CIdLs = {CIds[E0[0]], CIds[E0[1]]};
+                Vector2i CIdRs = {CIds[E1[0]], CIds[E1[1]]};
 
-                const core::ContactModel& model = contact_table.at(L, R);
+                Vector2i SCIdLs = {SCIds[E0[0]], SCIds[E0[1]]};
+                Vector2i SCIdRs = {SCIds[E1[0]], SCIds[E1[1]]};
 
-                // 2) if the contact model is not enabled, don't consider it
-                if(!model.is_enabled())
+                // 2) if this is a self-collision
+                UIPC_ASSERT(VInstanceIds[E0[0]] == VInstanceIds[E0[1]],
+                            "Why Edge({},{}) is not in the same instance?",
+                            E0[0],
+                            E0[1]);
+
+                UIPC_ASSERT(VInstanceIds[E1[0]] == VInstanceIds[E1[1]],
+                            "Why Edge({},{}) is not in the same instance?",
+                            E1[0],
+                            E1[1]);
+
+                if(VInstanceIds[E0[0]] == VInstanceIds[E1[0]])
+                {
+                    // if self-collision is not enabled, skip it
+                    if(!SelfCollision[E0[0]])
+                        return;
+                }
+
+                // 3) if the contact model is not enabled, don't consider it
+                if(!need_contact(subscene_tabular, SCIdLs, SCIdRs))
+                    return;
+
+                if(!need_contact(contact_table, CIdLs, CIdRs))
                     return;
 
                 Float D = geometry::edge_edge_squared_distance(
@@ -499,7 +601,9 @@ class SimplicialSurfaceDistanceCheck final : public SanityChecker
 
             std::string name = "close_mesh";
 
-            if(scene.info()["sanity_check"]["mode"] == "normal")
+            auto sanity_check_mode = scene.config().find<std::string>("sanity_check/mode");
+
+            if(sanity_check_mode->view()[0] == "normal")
             {
                 auto output_path = this_output_path();
                 namespace fs     = std::filesystem;

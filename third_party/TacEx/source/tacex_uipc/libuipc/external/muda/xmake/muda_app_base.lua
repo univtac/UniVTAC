@@ -14,6 +14,6 @@ function muda_app_base(kind)
     add_includedirs("external/", {public = false})
     add_headerfiles("src/muda/**.h","src/muda/**.inl")
     
-    add_cugencodes("compute_75")
+    add_cugencodes("native")
     add_links("cublas","cusparse")
 end

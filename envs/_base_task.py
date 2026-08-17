@@ -51,15 +51,7 @@ from isaaclab.utils.noise import (
 )
 
 from tacex_assets import TACEX_ASSETS_DATA_DIR
-from tacex_assets.sensors.gelsight_mini.gsmini_cfg import GelSightMiniCfg
-from tacex_uipc import (
-    UipcRLEnv,
-    UipcIsaacAttachments,
-    UipcIsaacAttachmentsCfg,
-    UipcObject,
-    UipcObjectCfg,
-    UipcSimCfg,
-)
+from tacex_uipc import UipcRLEnv, UipcSimCfg
 from tacex_uipc.utils import TetMeshCfg
 
 from typing import Any
@@ -114,6 +106,9 @@ class BaseTaskCfg(DirectRLEnvCfg):
     uipc_sim = UipcSimCfg(
         # logger_level="Info"
         dt=sim.dt,
+        # UniVTAC owns the UIPC -> Fabric -> RTX synchronization in
+        # _update_render(), immediately before the single render call.
+        update_render_meshes=False,
         ground_height=0.001,
         contact=UipcSimCfg.Contact(
             d_hat=0.0005,
@@ -186,6 +181,8 @@ class BaseTaskCfg(DirectRLEnvCfg):
 
     robot: RobotCfg = None
     tactile_sensor_type:Literal['gsmini', 'xensews', 'gf225'] = 'gsmini'
+    tactile_optical_backend: Literal["taxim", "pix2pix"] = "taxim"
+    """GelSight optical backend selected once when the environment starts."""
 
     planner_time_dilation_factor: float = 1.0
 
@@ -251,7 +248,9 @@ class BaseTask(UipcRLEnv):
     def load_robot_and_sensors(self, cfg:BaseTaskCfg):
         data_type = ["camera_depth", "tactile_rgb", "marker_rgb", "marker_motion"]
         if cfg.tactile_sensor_type == 'gsmini':
-            cfg.robot = create_franka_gsmini_gripper(data_type=data_type)
+            cfg.robot = create_franka_gsmini_gripper(
+                data_type=data_type, optical_backend=cfg.tactile_optical_backend
+            )
         elif cfg.tactile_sensor_type == 'gf225':
             cfg.robot = create_franka_gf225_gripper(data_type=data_type)
         elif cfg.tactile_sensor_type == 'xensews':

@@ -3,7 +3,7 @@
 #include <cub/warp/warp_reduce.cuh>
 #include <cub/warp/warp_scan.cuh>
 #include <cub/util_math.cuh>
-
+#include <cuda_device/bit_operation.h>
 namespace uipc::backend::cuda
 {
 void Spmv::sym_spmv(Float                           a,
@@ -19,7 +19,7 @@ void Spmv::sym_spmv(Float                           a,
     if(b != 0)
     {
         muda::ParallelFor()
-            .kernel_name(__FUNCTION__)
+            .file_line(__FILE__, __LINE__)
             .apply(y.size(),
                    [b = b, y = y.viewer().name("y")] __device__(int i) mutable
                    { y(i) = b * y(i); });
@@ -30,7 +30,7 @@ void Spmv::sym_spmv(Float                           a,
     }
 
     muda::ParallelFor()
-        .kernel_name(__FUNCTION__)
+        .file_line(__FILE__, __LINE__)
         .apply(A.triplet_count(),
                [a = a,
                 A = A.viewer().name("A"),
@@ -126,7 +126,7 @@ void Spmv::rbk_spmv(Float                           a,
     if(b != 0)
     {
         muda::ParallelFor()
-            .kernel_name(__FUNCTION__)
+            .file_line(__FILE__, __LINE__)
             .apply(y.size(),
                    [b = b, y = y.viewer().name("y")] __device__(int i) mutable
                    { y(i) = b * y(i); });
@@ -142,7 +142,7 @@ void Spmv::rbk_spmv(Float                           a,
     int block_count = (A.triplet_count() + block_dim - 1) / block_dim;
 
     muda::Launch(block_count, block_dim)
-        .kernel_name(__FUNCTION__)
+        .file_line(__FILE__, __LINE__)
         .apply(
             [a = a,
              A = A.viewer().name("A"),
@@ -160,7 +160,6 @@ void Spmv::rbk_spmv(Float                           a,
                 auto lane_id            = thread_id_in_block & (warp_size - 1);
 
                 int rest = A.triplet_count() - blockIdx.x * block_dim;
-                int valid_count_in_block = rest > block_dim ? block_dim : rest;
 
                 __shared__ union
                 {
@@ -228,18 +227,29 @@ void Spmv::rbk_spmv(Float                           a,
                     }
                 }
 
-                flags.flags =
-                    WarpReduceInt(temp_storage_int[warp_id])
-                        .HeadSegmentedReduce(flags.flags, flags.is_head, cub::Sum());
+                flags.flags = WarpReduceInt(temp_storage_int[warp_id])
+                                  .HeadSegmentedReduce(flags.flags,
+                                                       flags.is_head,
+                                                       [](uint32_t a, uint32_t b)
+                                                       { return a + b; });
 
                 vec.x() = WarpReduceFloat(temp_storage_float[warp_id])
-                              .HeadSegmentedReduce(vec.x(), flags.is_head, cub::Sum());
+                              .HeadSegmentedReduce(vec.x(),
+                                                   flags.is_head,
+                                                   [](Float a, Float b)
+                                                   { return a + b; });
 
                 vec.y() = WarpReduceFloat(temp_storage_float[warp_id])
-                              .HeadSegmentedReduce(vec.y(), flags.is_head, cub::Sum());
+                              .HeadSegmentedReduce(vec.y(),
+                                                   flags.is_head,
+                                                   [](Float a, Float b)
+                                                   { return a + b; });
 
                 vec.z() = WarpReduceFloat(temp_storage_float[warp_id])
-                              .HeadSegmentedReduce(vec.z(), flags.is_head, cub::Sum());
+                              .HeadSegmentedReduce(vec.z(),
+                                                   flags.is_head,
+                                                   [](Float a, Float b)
+                                                   { return a + b; });
 
 
                 // cub::WARP_SYNC(warp_mask);
@@ -247,11 +257,12 @@ void Spmv::rbk_spmv(Float                           a,
                 flags.is_head = b2i(flags.is_head && flags.is_valid);
 
                 flags.b2i();
-                int is_head_mask = cub::WARP_BALLOT(flags.is_head, warp_mask);
-                uint32_t offset  = fns(is_head_mask, 0, lane_id + 1);
+                int is_head_mask =
+                    detail::bit_operation::WARP_BALLOT(flags.is_head, warp_mask);
+                uint32_t offset = fns(is_head_mask, 0, lane_id + 1);
 
-                int valid_bit    = (offset != ~0u);
-                int shuffle_mask = cub::WARP_BALLOT(valid_bit, warp_mask);
+                int valid_bit = (offset != ~0u);
+                int shuffle_mask = detail::bit_operation::WARP_BALLOT(valid_bit, warp_mask);
 
                 i = cub::ShuffleIndex<32>(i, offset, shuffle_mask);
                 flags.flags = cub::ShuffleIndex<32>(flags.flags, offset, shuffle_mask);
@@ -290,7 +301,7 @@ void Spmv::rbk_sym_spmv(Float                           a,
     if(b != 0)
     {
         muda::ParallelFor()
-            .kernel_name(__FUNCTION__)
+            .file_line(__FILE__, __LINE__)
             .apply(y.size(),
                    [b = b, y = y.viewer().name("y")] __device__(int i) mutable
                    { y(i) = b * y(i); });
@@ -323,7 +334,6 @@ void Spmv::rbk_sym_spmv(Float                           a,
                 auto lane_id            = thread_id_in_block & (warp_size - 1);
 
                 int rest = A.triplet_count() - blockIdx.x * block_dim;
-                int valid_count_in_block = rest > block_dim ? block_dim : rest;
 
                 __shared__ union
                 {
@@ -332,7 +342,6 @@ void Spmv::rbk_sym_spmv(Float                           a,
                 };
 
                 int     prev_i = -1;
-                int     next_i = -1;
                 int     i      = -1;
                 Flags   flags;
                 Vector3 vec;
@@ -345,13 +354,6 @@ void Spmv::rbk_sym_spmv(Float                           a,
                 {
                     auto prev_triplet = A(global_thread_id - 1);
                     prev_i            = prev_triplet.row_index;
-                }
-
-                // set the next row index
-                if(global_thread_id < A.triplet_count() - 1 /* && global_thread_id>=0 */)
-                {
-                    auto next_triplet = A(global_thread_id + 1);
-                    next_i            = next_triplet.row_index;
                 }
 
                 if(global_thread_id < A.triplet_count())
@@ -390,18 +392,29 @@ void Spmv::rbk_sym_spmv(Float                           a,
 
 
                 // ----------------------------------- warp reduce ----------------------------------------------
-                flags.flags =
-                    WarpReduceInt(temp_storage_int[warp_id])
-                        .HeadSegmentedReduce(flags.flags, flags.is_head, cub::Sum());
+                flags.flags = WarpReduceInt(temp_storage_int[warp_id])
+                                  .HeadSegmentedReduce(flags.flags,
+                                                       flags.is_head,
+                                                       [](uint32_t a, uint32_t b)
+                                                       { return a + b; });
 
                 vec.x() = WarpReduceFloat(temp_storage_float[warp_id])
-                              .HeadSegmentedReduce(vec.x(), flags.is_head, cub::Sum());
+                              .HeadSegmentedReduce(vec.x(),
+                                                   flags.is_head,
+                                                   [](Float a, Float b)
+                                                   { return a + b; });
 
                 vec.y() = WarpReduceFloat(temp_storage_float[warp_id])
-                              .HeadSegmentedReduce(vec.y(), flags.is_head, cub::Sum());
+                              .HeadSegmentedReduce(vec.y(),
+                                                   flags.is_head,
+                                                   [](Float a, Float b)
+                                                   { return a + b; });
 
                 vec.z() = WarpReduceFloat(temp_storage_float[warp_id])
-                              .HeadSegmentedReduce(vec.z(), flags.is_head, cub::Sum());
+                              .HeadSegmentedReduce(vec.z(),
+                                                   flags.is_head,
+                                                   [](Float a, Float b)
+                                                   { return a + b; });
                 // ----------------------------------- warp reduce -----------------------------------------------
 
 

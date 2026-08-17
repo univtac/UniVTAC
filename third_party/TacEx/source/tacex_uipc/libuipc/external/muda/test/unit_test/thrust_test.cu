@@ -6,7 +6,11 @@
 #include <muda/ext/eigen.h>
 #include <thrust/system/cuda/execution_policy.h>
 #include <thrust/system/cuda/detail/par.h>
+#if CUDA_VERSION < 13000
 #include <thrust/async/for_each.h>
+#else
+#include <thrust/for_each.h>
+#endif
 #include <thrust/unique.h>
 
 #include "../example/example_common.h"
@@ -31,7 +35,15 @@ void thrust_test()
             for_each(nosync_policy,
                      make_counting_iterator(0),
                      make_counting_iterator(N),
-                     [buffer = make_dense_1d(ptr_n.first.get(), N).name("buffer")] __device__(int i) mutable
+                     [buffer = make_dense_1d(
+#if CUDA_VERSION < 13000
+                                   ptr_n.first.get()
+#else
+                        ptr_n.first
+#endif
+                                       ,
+                                   N)
+                                   .name("buffer")] __device__(int i) mutable
                      {
                          buffer(i) = i;
                          some_work();
@@ -47,7 +59,15 @@ void thrust_test()
                 .next<ParallelFor>()
                 .kernel_name("muda")
                 .apply(N,
-                       [buffer = make_dense_1d(ptr_n.first.get(), N).name("buffer")] __device__(int i) mutable
+                       [buffer = make_dense_1d(
+#if CUDA_VERSION < 13000
+                                     ptr_n.first.get()
+#else
+                                     ptr_n.first
+#endif
+                                         ,
+                                     N)
+                                     .name("buffer")] __device__(int i) mutable
                        {
                            buffer(i) = i;
                            // some_work();
@@ -65,7 +85,15 @@ void thrust_test()
             for_each(nosync_policy,
                      counting_iterator<int>{0},
                      counting_iterator<int>{N},
-                     [buffer = make_dense_1d(ptr_n.first.get(), N).name("buffer")] __device__(int i) mutable
+                     [buffer = make_dense_1d(
+#if CUDA_VERSION < 13000
+                                   ptr_n.first.get()
+#else
+                        ptr_n.first
+#endif
+                                       ,
+                                   N)
+                                   .name("buffer")] __device__(int i) mutable
                      {
                          buffer(i) = i;
                          // some_work();
@@ -83,7 +111,15 @@ void thrust_test()
             for_each(nosync_policy,
                      counting_iterator<int>{0},
                      counting_iterator<int>{N},
-                     [buffer = make_dense_1d(ptr_n.first.get(), N).name("buffer")] __device__(int i) mutable
+                     [buffer = make_dense_1d(
+#if CUDA_VERSION < 13000
+                                   ptr_n.first.get()
+#else
+                        ptr_n.first
+#endif
+                                       ,
+                                   N)
+                                   .name("buffer")] __device__(int i) mutable
                      {
                          buffer(i) = i;
                          // some_work();

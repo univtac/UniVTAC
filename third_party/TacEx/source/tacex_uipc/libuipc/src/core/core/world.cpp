@@ -8,7 +8,7 @@
 #include <dylib.hpp>
 #include <uipc/backend/module_init_info.h>
 #include <uipc/core/internal/world.h>
-#include <iostream>
+
 
 namespace uipc::core
 {
@@ -26,8 +26,6 @@ World::~World() {}
 
 void World::init(Scene& s)
 {
-    //TODO
-    std::cout << "Init test " << "\n";
     m_internal->init(*s.m_internal);
 }
 
@@ -46,11 +44,6 @@ void World::retrieve()
     m_internal->retrieve();
 }
 
-void World::backward()
-{
-    m_internal->backward();
-}
-
 bool World::dump()
 {
     return m_internal->dump();
@@ -59,12 +52,6 @@ bool World::dump()
 bool World::recover(SizeT aim_frame)
 {
     return m_internal->recover(aim_frame);
-}
-
-bool World::write_vertex_pos_to_sim(span<const Vector3> positions, IndexT global_vertex_offset, IndexT local_vertex_offset, SizeT vertex_count, string system_name)
-{   
-    // std::cout << "write_vertex_pos test " << "\n";
-    return m_internal->write_vertex_pos_to_sim(positions, global_vertex_offset, local_vertex_offset, vertex_count, system_name);
 }
 
 bool World::is_valid() const
@@ -80,5 +67,15 @@ SizeT World::frame() const
 const FeatureCollection& World::features() const
 {
     return m_internal->features();
+}
+
+SanityChecker& World::sanity_checker()
+{
+    return m_internal->sanity_checker();
+}
+
+const SanityChecker& World::sanity_checker() const
+{
+    return m_internal->sanity_checker();
 }
 }  // namespace uipc::core

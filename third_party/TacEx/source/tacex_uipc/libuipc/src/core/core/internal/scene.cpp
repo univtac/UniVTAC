@@ -3,22 +3,21 @@
 
 namespace uipc::core::internal
 {
-Scene::Scene(const Json& config) noexcept
+Scene::Scene(const geometry::AttributeCollection& config) noexcept
     : m_animator{*this}
-    , m_sanity_checker(*this)
+    , m_config{config}
 {
-    m_config = config;
 }
 
 void Scene::init(internal::World& world) noexcept
 {
     m_world = &world;
 
-    m_dt = m_config["dt"].get<Float>();
-
     m_constitution_tabular.init(*this);
 
-    if(m_config["diff_sim"]["enable"].get<bool>())
+    // If differentiable simulation is enabled initialize it
+    auto diff_sim_enable = m_config.find<IndexT>("diff_sim/enable");
+    if(diff_sim_enable->view()[0])
     {
         m_diff_sim.init(*this);
     }
@@ -46,12 +45,44 @@ void Scene::update_from(const SceneSnapshotCommit& commit)
         return;
     }
 
-    m_config = commit.m_config;
+    m_config.update_from(*commit.m_config);
+
     m_objects.update_from(*this, commit.m_object_collection);
     m_contact_tabular.update_from(*commit.m_contact_models, commit.m_contact_elements);
 
     m_geometries.update_from(commit.m_geometries);
     m_rest_geometries.update_from(commit.m_rest_geometries);
+}
+
+Float Scene::dt() const noexcept
+{
+    auto dt_attr = m_config.find<Float>("dt");
+    UIPC_ASSERT(dt_attr, "Scene config must have a 'dt' attribute.");
+    return dt_attr->view()[0];
+}
+
+template <typename T>
+void create_and_set(geometry::AttributeCollection& coll,
+                    std::string_view               key,
+                    const T&                       value,
+                    const T&                       default_value = T{0})
+{
+    auto attr = coll.find<T>(key);
+    if(!attr)
+        attr = coll.create<T>(key, default_value);
+    view(*attr)[0] = value;
+}
+
+template <typename T, int M, int N>
+void create_and_set(geometry::AttributeCollection& coll,
+                    std::string_view               key,
+                    const Matrix<T, M, N>&         value,
+                    const Matrix<T, M, N>& default_value = Matrix<T, M, N>::Zero())
+{
+    auto attr = coll.find<Matrix<T, M, N>>(key);
+    if(!attr)
+        attr = coll.create<Matrix<T, M, N>>(key, default_value);
+    view(*attr)[0] = value;
 }
 
 Scene::~Scene() = default;

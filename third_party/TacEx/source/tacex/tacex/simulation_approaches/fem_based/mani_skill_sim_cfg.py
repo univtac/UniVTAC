@@ -33,9 +33,9 @@ class ManiSkillSimulatorCfg(GelSightSimulatorCfg):
 
     normalize: bool = False
 
-    camera_to_surface: float = 0.0283,
+    camera_to_surface: float = 0.0283
 
-    real_size: tuple[float, float] = (0.0266, 0.0209),
+    real_size: tuple[float, float] = (0.0266, 0.0209)
 
     tactile_img_res: tuple[int, int] = (320, 240)
     """Resolution of the Tactile Image.

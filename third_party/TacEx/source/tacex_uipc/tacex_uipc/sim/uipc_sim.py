@@ -14,24 +14,30 @@ try:
     from isaacsim.util.debug_draw import _debug_draw
 
     draw = _debug_draw.acquire_debug_draw_interface()
-except Exception:
+except ImportError:
     import warnings
 
     warnings.warn("_debug_draw failed to import", ImportWarning)
     draw = None
 
-from uipc import Logger, Timer, builtin
+import numpy as np
+
+from uipc import Logger, Timer
 from uipc.core import Engine, Scene, SceneIO, World
 from uipc.geometry import extract_surface, ground
 from uipc.unit import GPa
 
 from tacex_uipc.objects import UipcObject
-from tacex_uipc.utils import MeshGenerator
+from tacex_uipc.utils import MeshGenerator, add_barycentric_primvar, create_surf_tri_vis_material
 
 
 @configclass
 class UipcSimCfg:
     device: str | None = "cuda"
+
+    update_render_meshes: bool = True
+
+    debug_vis: bool = False
 
     dt: float = 0.01
 
@@ -57,6 +63,8 @@ class UipcSimCfg:
     @configclass
     class Newton:
         max_iter: int = 1024
+
+        min_iter: int = 1
 
         use_adaptive_tol: bool = False
 
@@ -134,14 +142,11 @@ class UipcSimCfg:
 class UipcSim:
     cfg: UipcSimCfg
 
-    def __init__(self, cfg: UipcSimCfg = None):
+    def __init__(self, cfg: UipcSimCfg = UipcSimCfg()):
         """Initialize the uipc simulation."""
         # will be initialized in `setup_sim()`
         self.isaac_sim = None
-
-        if cfg is None:
-            cfg = UipcSimCfg()
-        self.cfg = cfg
+        self.cfg: UipcSimCfg = cfg
 
         Timer.enable_all()
         if self.cfg.logger_level == "Error":
@@ -178,9 +183,11 @@ class UipcSim:
             "solver": self.cfg.linear_system.solver,
             "tol_rate": self.cfg.linear_system.tol_rate,
         }
+
         uipc_config["newton"] = {
             "ccd_tol": self.cfg.newton.ccd_tol,
             "max_iter": self.cfg.newton.max_iter,
+            "min_iter": self.cfg.newton.min_iter,
             "use_adaptive_tol": self.cfg.newton.use_adaptive_tol,
             "velocity_tol": self.cfg.newton.velocity_tol,
             "transrate_tol": self.cfg.newton.transrate_tol,
@@ -190,8 +197,8 @@ class UipcSim:
 
         # create ground
         ground_obj = self.scene.objects().create("ground")
-        g = ground(self.cfg.ground_height, self.cfg.ground_normal)
-        ground_obj.geometries().create(g)
+        uipc_ground = ground(self.cfg.ground_height, self.cfg.ground_normal)
+        ground_obj.geometries().create(uipc_ground)
 
         # set default friction ratio and contact resistance
         self.scene.contact_tabular().default_model(
@@ -200,18 +207,12 @@ class UipcSim:
             enable=self.cfg.contact.enable,
         )
 
-        # vertex offsets of the subsystems
-        self._system_vertex_offsets = {
-            "uipc::backend::cuda::GlobalVertexManager": [0],  # global vertex offset
-            "uipc::backend::cuda::FiniteElementMethod": [0],
-            "uipc::backend::cuda::AffineBodyDynamics": [0],
-        }
-
         # for rendering: used to extract which points belong to which surface mesh
         self._surf_vertex_offsets = [0]
 
         self._fabric_meshes = []
         self.uipc_objects: list[UipcObject] = []
+        self._debug_vis_handle = None
 
         self.stage = usdrt.Usd.Stage.Attach(omni.usd.get_context().get_stage_id())
 
@@ -229,47 +230,12 @@ class UipcSim:
         self.world.init(self.scene)
         self.world.retrieve()
 
-        # trans = geo_slot.geometry().transforms().view()
-        # print("init trans ", trans)
-
-        # for each obj, compute the global_system_id -> used to infer the objects vertex_offset in the global system
-        for uipc_obj in self.uipc_objects:
-            geo_slot = uipc_obj.geo_slot_list[0]
-            geo = geo_slot.geometry()
-            gvo = geo.meta().find(builtin.global_vertex_offset)
-            
-            if gvo is None:
-                # Try to trigger vertex reporting by advancing one step
-                print(f"Warning: global_vertex_offset not found for {uipc_obj.cfg.prim_path}")
-                print(f"Object constitution: {type(uipc_obj.cfg.constitution_cfg).__name__}")
-                print("Attempting to initialize vertex reporting...")
-                
-                # Advance the simulation once to trigger vertex reporting
-                self.world.advance()
-                self.world.retrieve()
-                
-                # Try to find the attribute again
-                gvo = geo.meta().find(builtin.global_vertex_offset)
-                
-                if gvo is None:
-                    raise RuntimeError(
-                        f"Failed to initialize global_vertex_offset for object {uipc_obj.cfg.prim_path}. "
-                        f"This object may not be properly configured for UIPC simulation. "
-                        f"Check:\n"
-                        f"1. Object constitution type: {type(uipc_obj.cfg.constitution_cfg).__name__}\n"
-                        f"2. Mesh configuration: {uipc_obj.cfg.mesh_cfg}\n"
-                        f"3. Ensure the object is properly added to the UIPC scene before calling setup_sim()"
-                    )
-            
-            global_vertex_offset = int(gvo.view()[0])
-            self._system_vertex_offsets["uipc::backend::cuda::GlobalVertexManager"].append(global_vertex_offset)
-
-            uipc_obj.global_system_id = len(self._system_vertex_offsets["uipc::backend::cuda::GlobalVertexManager"]) - 1
-            print(f"{uipc_obj.cfg.prim_path} has global id {uipc_obj.global_system_id}")
-
         # initialize callbacks
         self.isaac_sim: sim_utils.SimulationContext = sim_utils.SimulationContext.instance()
         self.isaac_sim.add_physics_callback("uicp_step", self.step)
+
+        if self.cfg.update_render_meshes:
+            self.isaac_sim.add_physics_callback("uicp_update_render_meshes", self.update_render_meshes)
 
     def step(self, dt=0):
         self.world.advance()
@@ -287,7 +253,6 @@ class UipcSim:
 
         # short_cut_trans = geo_slot.geometry().transforms().view()
         self.world.retrieve()
-        self.update_render_meshes()
 
     def update_render_meshes(self, dt=0):
         all_trimesh_points = self.sio.simplicial_surface(2).positions().view().reshape(-1, 3)
@@ -297,15 +262,26 @@ class UipcSim:
 
             fabric_mesh_points = fabric_prim.GetAttribute("points")
             fabric_mesh_points.Set(usdrt.Vt.Vec3fArray(trimesh_points))
-        # NOTE: Currently there is a 1 frame delay between the points we set and what's rendered in Isaac
-        # NOTE: if you draw the points and let it render, you see that the mesh is lagging behind the points
-        # draw.clear_points()
-        # points = np.array(all_trimesh_points)
-        # draw.draw_points(points, [(255,0,255,0.5)]*points.shape[0], [30]*points.shape[0])
 
-        if self.isaac_sim is not None:
-            # additional render call to somewhat mitigate render delay
-            self.isaac_sim.render()
+            # if self.cfg.debug_vis:
+            #     # draw surface mesh
+            #     triangles = self.sio.simplicial_surface(2).triangles()
+            #     for i in range(0, len(trimesh_points), 3):
+            #         test = trimesh_points
+            #         # draw.draw_points(tet_points, [(255, 255, 255, 1)] * len(tet_points), [40] * len(tet_points))
+            #         # draw.draw_lines(
+            #         #     [tet_points[0]] * 2, tet_points[1:], color * 2, [10] * 2
+            #         # )  # draw from point 0 to every other point (3 times 0, cause line from 0 to the other 3 points)
+            #         # draw.draw_lines([tet_points[1]] * 1, tet_points[2:], color * 1, [10] * 1)
+
+        if self.cfg.debug_vis:
+            draw.clear_points()
+            points = np.array(all_trimesh_points)
+            draw.draw_points(points, [(255, 0, 255, 0.5)] * points.shape[0], [30] * points.shape[0])
+
+        # if self.isaac_sim is not None:
+        #     # additional render call to somewhat mitigate render delay
+        #     self.isaac_sim.render()
 
     @staticmethod
     def get_sim_time_report(as_json: bool = False):
@@ -336,12 +312,20 @@ class UipcSim:
             print(f"No data for frame {frame_num}.")
 
     def init_libuipc_scene_rendering(self):
+        """Render method for "standalone" libuipc scenes (e.g. the examples in tacex_uipc/examples/libuipc-samples).
+
+        The method simply creates UsdGeom meshes and updates each mesh in Isaac Sim with the data from libuipc simulation.
+        The main difference to the "IsaacLab x UIPC" render method is, that we define each mesh (and not load it from a usd file) and
+        that we update **every mesh**.
+
+        With our IsaacLab x UIPC workflow, we have meshes that are not updated by uipc (e.g. robots) and we load the meshes from USD files.
+        """
         num_objs = self.scene.objects().size()
         for obj_id in range(1, num_objs):
             # print("obj id ", obj_id)
             obj = self.scene.objects().find(obj_id)
             obj_geometry_ids = obj.geometries().ids()
-            # obj_name = obj.name() #-- doesn't work, get error message (otherwise use this to set prim_path)
+            obj_name = obj.name()
 
             # create prim for each geometry
             for id in obj_geometry_ids:
@@ -356,7 +340,7 @@ class UipcSim:
                     id += instance_num
                     # spawn a usd mesh in Isaac
                     stage = omni.usd.get_context().get_stage()
-                    prim_path = f"/World/uipc_mesh_{id}"
+                    prim_path = f"/World/{obj_name}_{id}"
                     prim = UsdGeom.Mesh.Define(stage, prim_path)
 
                     dim = geom.dim()
@@ -370,7 +354,7 @@ class UipcSim:
                     surf_tri = surf.triangles().topo().view().reshape(-1).tolist()
                     surf_points_world = surf.positions().view().reshape(-1, 3)
 
-                    MeshGenerator.update_usd_mesh(prim=prim, surf_points=surf_points_world, triangles=surf_tri)
+                    MeshGenerator.update_usd_mesh(gprim=prim, surf_points=surf_points_world, triangles=surf_tri)
 
                     # setup mesh updates via Fabric
                     fabric_stage = usdrt.Usd.Stage.Attach(omni.usd.get_context().get_stage_id())
@@ -380,15 +364,30 @@ class UipcSim:
                     if not fabric_prim.HasAttribute("Deformable"):
                         fabric_prim.CreateAttribute("Deformable", usdrt.Sdf.ValueTypeNames.PrimTypeTag, True)
 
-                    # extract world transform
-                    rtxformable = usdrt.Rt.Xformable(fabric_prim)
-                    rtxformable.CreateFabricHierarchyWorldMatrixAttr()
-                    # set world matrix to identity matrix -> uipc already gives us vertices in world frame
-                    rtxformable.GetFabricHierarchyWorldMatrixAttr().Set(usdrt.Gf.Matrix4d())
+                    stage_id = omni.usd.get_context().get_stage_id()
+                    fabric_id = fabric_stage.GetFabricId()
 
-                    # update fabric mesh with world coor. points
-                    fabric_mesh_points_attr = fabric_prim.GetAttribute("points")
-                    fabric_mesh_points_attr.Set(usdrt.Vt.Vec3fArray(surf_points_world))
+                    hier = usdrt.hierarchy.IFabricHierarchy().get_fabric_hierarchy(fabric_id, stage_id)
+                    hier.set_world_xform(usdrt.Sdf.Path(prim_path), usdrt.Gf.Matrix4d(1))
+                    hier.update_world_xforms()
+
+                    if self.cfg.debug_vis:
+                        add_barycentric_primvar(prim)
+                        mat_path = "/World/Materials/TriangleOutlineMat"
+                        stage = omni.usd.get_context().get_stage()
+                        mat = stage.GetPrimAtPath(mat_path)
+                        if not mat.IsValid():
+                            mat = create_surf_tri_vis_material(
+                                mat_path=mat_path,
+                                primvar_name="baryCoord",
+                                outline_color=(0.8, 0.8, 0.8),
+                                outline_width=0.05,
+                                base_color=(0.0, 0.0, 0.8),
+                            )
+
+                        # bind material with fabric
+                        rel = fabric_prim.GetRelationship(usdrt.UsdShade.Tokens.materialBinding)
+                        rel.SetTargets([mat_path])
 
                     # add fabric meshes to uipc sim class for updating the render meshes
                     self._fabric_meshes.append(fabric_prim)

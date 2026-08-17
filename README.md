@@ -7,7 +7,7 @@
 
 ## Installation
 
-Clone the repository and run the installation script `scripts/install.sh` to set up the environment and install dependencies all at once. The script will create a conda environment named `UniVTAC` and install Isaac Sim, Isaac Lab, TacEx, cuRobo, and other necessary packages.
+The `isaac51` branch targets Isaac Sim 5.1.0 and Isaac Lab 2.3.0. The installer creates a project-local Python 3.11 `.venv` with `uv`, then installs the modified local TacEx, libuipc and cuRobo dependencies.
 
 ```bash
 git clone https://github.com/univtac/UniVTAC.git
@@ -15,7 +15,7 @@ cd UniVTAC
 bash scripts/install.sh
 ```
 
-See the [Installation Guide](./docs/Installation.md) for detailed setup instructions, including installing the environment, installing TacEx from the modified local source and setting up cuRobo for motion planning.
+See the [Installation Guide](./docs/Installation.md) for CUDA/compiler prerequisites and verification, and the [migration notes](./docs/isaacsim_5_1_migration.md) for the new GelSight, Actor and render-pipeline behavior.
 
 ## Task Gallery
 

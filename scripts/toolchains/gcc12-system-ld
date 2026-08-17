@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+compiler="${UNIVTAC_GCC12:-$(command -v x86_64-conda-linux-gnu-gcc)}"
+exec "$compiler" -B/usr/bin "$@"

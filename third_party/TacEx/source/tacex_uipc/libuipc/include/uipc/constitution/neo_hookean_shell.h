@@ -13,9 +13,9 @@ class UIPC_CONSTITUTION_API NeoHookeanShell : public FiniteElementConstitution
     NeoHookeanShell(const Json& config = default_config()) noexcept;
 
     void apply_to(geometry::SimplicialComplex& sc,
-                  const ElasticModuli& moduli = ElasticModuli::youngs_poisson(10.0_MPa, 0.49),
-                  Float mass_density = 1e3,
-                  Float thickness    = 0.01_m) const;
+                  const ElasticModuli& moduli = ElasticModuli::youngs_poisson(1.0_MPa, 0.49),
+                  Float mass_density = 2e2,
+                  Float thickness    = 0.001_m) const;
 
     static Json default_config() noexcept;
 

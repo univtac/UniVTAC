@@ -34,7 +34,12 @@ void device_query()
     std::cout << "maxGridSize: (" << prop.maxGridSize[0] << ","
               << prop.maxGridSize[1] << "," << prop.maxGridSize[2]
               << ")  |>Maximum size of each dimension of a grid" << std::endl;
-    std::cout << "clockRate: " << prop.clockRate << "  |>"
+    std::cout
+#if CUDA_VERSION < 13000
+     << "clockRate: " << prop.clockRate << "  |>"
+#else
+    // TODO: clockRate?
+#endif
               << "Clock frequency in kilohertz" << std::endl;
     std::cout << "totalConstMem: " << prop.totalConstMem << "  |>"
               << "Constant memory available on device in bytes" << std::endl;
@@ -47,25 +52,45 @@ void device_query()
     std::cout << "texturePitchAlignment: " << prop.texturePitchAlignment << "  |>"
               << "Pitch alignment requirement for texture references bound to pitched memory"
               << std::endl;
-    std::cout << "deviceOverlap: " << prop.deviceOverlap << "  |>"
+    std::cout 
+#if CUDA_VERSION < 13000
+    << "deviceOverlap: " << prop.deviceOverlap << "  |>"
+#else
+// TODO: deviceOverlap?
+#endif
               << "Device can concurrently copy memory and execute a kernel. Deprecated. Use instead asyncEngineCount."
               << std::endl;
     std::cout << "multiProcessorCount: " << prop.multiProcessorCount << "  |>"
               << "Number of multiprocessors on device" << std::endl;
-    std::cout << "kernelExecTimeoutEnabled: " << prop.kernelExecTimeoutEnabled << "  |>"
+    std::cout 
+#if CUDA_VERSION < 13000
+    << "kernelExecTimeoutEnabled: " << prop.kernelExecTimeoutEnabled << "  |>"
+#else
+// TODO: kernelExecTimeoutEnabled?
+#endif
               << "Specified whether there is a run time limit on kernels" << std::endl;
     std::cout << "Integrated: " << prop.integrated << "  |>"
               << "Device is integrated as opposed to discrete" << std::endl;
     std::cout << "canMapHostMemory: " << prop.canMapHostMemory << "  |>"
               << "Device can map host memory with cudaHostAlloc/cudaHostGetDevicePointer"
               << std::endl;
-    std::cout << "computeMode: " << prop.computeMode << "  |>"
+    std::cout
+#if CUDA_VERSION < 13000
+     << "computeMode: " << prop.computeMode << "  |>"
+#else
+// TODO: computeMode?
+#endif
               << "Compute mode (See ::cudaComputeMode)" << std::endl;
     std::cout << "maxTexture1D: " << prop.maxTexture1D << "  |>"
               << "Maximum 1D texture size" << std::endl;
     std::cout << "maxTexture1DMipmap: " << prop.maxTexture1DMipmap << "  |>"
               << "Maximum 1D mipmapped texture size" << std::endl;
-    std::cout << "maxTexture1DLinear: " << prop.maxTexture1DLinear << "  |>"
+    std::cout 
+#if CUDA_VERSION < 13000
+    << "maxTexture1DLinear: " << prop.maxTexture1DLinear << "  |>"
+#else
+// TODO maxTexture1DLinear?
+#endif
               << "Deprecated, do not use. Use cudaDeviceGetTexture1DLinearMaxWidth() or cuDeviceGetTexture1DLinearMaxWidth() instead."
               << std::endl;
     std::cout << "maxTexture2D: (" << prop.maxTexture2D[0] << ","
@@ -137,7 +162,12 @@ void device_query()
               << "Number of asynchronous engines" << std::endl;
     std::cout << "unifiedAddressing: " << prop.unifiedAddressing << "  |>"
               << "Device shares a unified address space with the host" << std::endl;
-    std::cout << "memoryClockRate: " << prop.memoryClockRate << "  |>"
+    std::cout 
+#if CUDA_VERSION < 13000
+        << "memoryClockRate: " << prop.memoryClockRate << "  |>"
+#else
+// TODO: memoryClockRate?
+#endif
               << "Peak memory clock frequency in kilohertz" << std::endl;
     std::cout << "memoryBusWidth: " << prop.memoryBusWidth << "  |>"
               << "Global memory bus width in bits" << std::endl;
@@ -169,8 +199,12 @@ void device_query()
     std::cout << "hostNativeAtomicSupported: " << prop.hostNativeAtomicSupported << "  |>"
               << "Link between the device and the host supports native atomic operations"
               << std::endl;
-    std::cout << "singleToDoublePrecisionPerfRatio: " << prop.singleToDoublePrecisionPerfRatio
-              << "  |>"
+    std::cout 
+#if CUDA_VERSION < 13000
+    << "singleToDoublePrecisionPerfRatio: " << prop.singleToDoublePrecisionPerfRatio << "  |>"
+#else
+    // TODO: singleToDoublePrecisionPerfRatio?
+#endif
               << "Ratio of single precision performance (in floating-point operations per second) to double precision performance"
               << std::endl;
     std::cout << "pageableMemoryAccess: " << prop.pageableMemoryAccess << "  |>"
@@ -188,7 +222,12 @@ void device_query()
     std::cout << "cooperativeLaunch: " << prop.cooperativeLaunch << "  |>"
               << "Device supports launching cooperative kernels via ::cudaLaunchCooperativeKernel"
               << std::endl;
-    std::cout << "cooperativeMultiDeviceLaunch: " << prop.cooperativeMultiDeviceLaunch
+    std::cout 
+#if CUDA_VERSION < 13000
+<< "cooperativeMultiDeviceLaunch: " << prop.cooperativeMultiDeviceLaunch
+#else
+// TODO: cooperativeMultiDeviceLaunch?
+#endif
               << "  |>"
               << "Deprecated, cudaLaunchCooperativeKernelMultiDevice is deprecated."
               << std::endl;

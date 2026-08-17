@@ -21,14 +21,14 @@
 
 #include <muda/launch.h>
 
+namespace muda
+{
 // for encode run length usage
 MUDA_GENERIC constexpr bool operator==(const int2& a, const int2& b)
 {
     return a.x == b.x && a.y == b.y;
 }
 
-namespace muda
-{
 namespace details
 {
     class MatrixFormatConverterBase
@@ -204,8 +204,8 @@ namespace details
                         ij_pairs = ij_pairs.viewer().name("ij_pairs")] __device__(int i) mutable
                        {
                            auto hash      = ij_hash(i);
-                           auto row_index = int{hash >> 32};
-                           auto col_index = int{hash & 0xFFFFFFFF};
+                           auto row_index = static_cast<int>(hash >> 32);
+                           auto col_index = static_cast<int>(hash & 0xFFFFFFFF);
                            ij_pairs(i).x  = row_index;
                            ij_pairs(i).y  = col_index;
                        });
@@ -256,8 +256,8 @@ namespace details
                             "col_indices")] __device__(int i) mutable
                        {
                            auto hash      = ij_hash(i);
-                           auto row_index = int{hash >> 32};
-                           auto col_index = int{hash & 0xFFFFFFFF};
+                           auto row_index = static_cast<int>(hash >> 32);
+                           auto col_index = static_cast<int>(hash & 0xFFFFFFFF);
                            row_indices(i) = row_index;
                            col_indices(i) = col_index;
                        });
@@ -292,13 +292,12 @@ namespace details
                        [sort_index = sort_index.viewer().name("sort_index")] __device__(
                            int i) mutable { sort_index(i) = i; });
 
-            DeviceMergeSort().SortPairs(ij_pairs.data(),
-                                        sort_index.data(),
-                                        ij_pairs.size(),
-                                        [] __device__(const int2& a, const int2& b) {
-                                            return a.x < b.x
-                                                   || (a.x == b.x && a.y < b.y);
-                                        });
+            DeviceMergeSort().SortPairs(
+                ij_pairs.data(),
+                sort_index.data(),
+                ij_pairs.size(),
+                [] __device__(const int2& a, const int2& b)
+                { return a.x < b.x || (a.x == b.x && a.y < b.y); });
 
 
             // set ij_pairs back to row_indices and col_indices
@@ -527,13 +526,12 @@ namespace details
                            ij_pairs(i).y = col_indices(i);
                        });
 
-            DeviceMergeSort().SortPairs(ij_pairs.data(),
-                                        to.m_values.data(),
-                                        ij_pairs.size(),
-                                        [] __device__(const int2& a, const int2& b) {
-                                            return a.x < b.x
-                                                   || (a.x == b.x && a.y < b.y);
-                                        });
+            DeviceMergeSort().SortPairs(
+                ij_pairs.data(),
+                to.m_values.data(),
+                ij_pairs.size(),
+                [] __device__(const int2& a, const int2& b)
+                { return a.x < b.x || (a.x == b.x && a.y < b.y); });
 
             // set ij_pairs back to row_indices and col_indices
 

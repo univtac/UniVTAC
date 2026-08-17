@@ -54,12 +54,6 @@ class Dense2DBase : public ViewerBase<IsConst>  // TODO
         return ConstViewer{m_data, m_offset, m_dim, m_pitch_bytes};
     }
 
-    MUDA_GENERIC operator ConstViewer() const MUDA_NOEXCEPT
-    {
-        return as_const();
-    }
-
-
     MUDA_GENERIC auto_const_t<T>& operator()(int x, int y) MUDA_NOEXCEPT
     {
         check();

@@ -1,4 +1,4 @@
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <app/asset_dir.h>
 #include <uipc/uipc.h>
 
@@ -44,7 +44,4 @@ TEST_CASE("contact_model", "[contact_model]")
     default_element.apply_to(mesh2);
     REQUIRE(default_element.name() == "default");
     REQUIRE(mesh2.meta().find<IndexT>(builtin::contact_element_id)->view().front() == 0);
-
-    //Json j = contact_tabular;
-    //std::cout << j.dump(4) << std::endl;
 }

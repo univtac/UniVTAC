@@ -144,9 +144,9 @@ class MarkerMotion:
     def _motion_callback(self, marker_x_pos, marker_y_pos, depth_map, contact_mask, traj):
         # normalize height of depth map
         depth_map = depth_map - depth_map.min()
-        # Convert from m to cm, cause this cm is used in fots?
+        # Convert from m to mm - or to cm, cause cm is used in fots?
         # See https://github.com/Rancho-zhao/FOTS/blob/FOTS-mujoco/marker_motion.py#L107
-        depth_map /= 10
+        depth_map /= 1000
 
         # extract which markers are in contact
         for i in range(self.num_markers_col):

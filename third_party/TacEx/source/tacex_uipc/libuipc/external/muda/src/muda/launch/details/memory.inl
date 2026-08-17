@@ -192,7 +192,7 @@ MUDA_INLINE MUDA_HOST Memory& Memory::set(
             [&]
             {
                 checkCudaErrors(cudaMemset2DAsync(
-                    data, (int)value, width_bytes, height, pitch, stream()));
+                    data, pitch, (int)value, width_bytes, height, stream()));
             },
             [&]
             {
@@ -210,7 +210,7 @@ MUDA_INLINE MUDA_HOST Memory& Memory::set(
     else
     {
         checkCudaErrors(
-            cudaMemset2DAsync(data, (int)value, width_bytes, height, pitch, stream()));
+            cudaMemset2DAsync(data, pitch, (int)value, width_bytes, height, stream()));
     }
     return *this;
 }
@@ -233,7 +233,7 @@ MUDA_INLINE MUDA_HOST Memory& Memory::alloc(cudaPitchedPtr*   pitched_ptr,
     return alloc_3d(pitched_ptr, extent, async);
 }
 
-MUDA_INLINE MUDA_HOST Memory& muda::Memory::free(cudaPitchedPtr pitched_ptr, bool async)
+MUDA_INLINE MUDA_HOST Memory& Memory::free(cudaPitchedPtr pitched_ptr, bool async)
 {
     return free(pitched_ptr.ptr, async);
 }

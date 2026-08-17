@@ -10,7 +10,7 @@ namespace uipc::core::internal
 {
 class World;
 
-class UIPC_CORE_API Engine final
+class UIPC_CORE_API Engine final : public std::enable_shared_from_this<Engine>
 {
     class Impl;
 
@@ -18,6 +18,12 @@ class UIPC_CORE_API Engine final
     Engine(std::string_view backend_name,
            std::string_view workspace = "./",
            const Json&      config    = default_config());
+
+    Engine(std::string_view backend_name,
+           S<IEngine>       overrider,
+           std::string_view workspace = "./",
+           const Json&      config    = default_config());
+
     ~Engine();
 
     std::string_view         backend_name() const noexcept;
@@ -34,12 +40,10 @@ class UIPC_CORE_API Engine final
     // only be called by internal::world
     void  init(internal::World& world);
     void  advance();
-    void  backward();
     void  sync();
     void  retrieve();
     bool  dump();
     bool  recover(SizeT dst_frame);
-    bool  write_vertex_pos_to_sim(span<const Vector3> positions, IndexT global_vertex_offset, IndexT local_vertex_offset, SizeT vertex_count, string system_name);
     SizeT frame() const;
 
     U<Impl> m_impl;

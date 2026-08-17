@@ -9,6 +9,13 @@
 #include <utils/offset_count_collection.h>
 namespace uipc::backend::cuda
 {
+// Define a simple POD to avoid constructing CUDA's built-in vector type with pmr allocators in host code
+struct SizeT2
+{
+    SizeT x;
+    SizeT y;
+};
+
 class DiagLinearSubsystem;
 class OffDiagLinearSubsystem;
 class IterativeSolver;
@@ -78,14 +85,14 @@ class GlobalLinearSystem : public SimSystem
         }
 
         HessianStorageType storage_type() { return m_storage_type; }
-        TripletMatrixView  hessian() { return m_hessian; }
-        DenseVectorView    gradient() { return m_gradient; }
+        TripletMatrixView  hessians() { return m_hessians; }
+        DenseVectorView    gradients() { return m_gradients; }
 
       private:
         friend class Impl;
         SizeT              m_index = ~0ull;
-        TripletMatrixView  m_hessian;
-        DenseVectorView    m_gradient;
+        TripletMatrixView  m_hessians;
+        DenseVectorView    m_gradients;
         HessianStorageType m_storage_type;
         Impl*              m_impl = nullptr;
     };
@@ -260,16 +267,16 @@ class GlobalLinearSystem : public SimSystem
 
         Float reserve_ratio = 1.1;
 
-        vector<LinearSubsytemInfo> subsystem_infos;
+        std::vector<LinearSubsytemInfo> subsystem_infos;
 
         OffsetCountCollection<IndexT> diag_dof_offsets_counts;
         OffsetCountCollection<IndexT> subsystem_triplet_offsets_counts;
 
-        vector<ulonglong2> off_diag_lr_triplet_counts;
+        std::vector<SizeT2> off_diag_lr_triplet_counts;
 
 
-        vector<int> accuracy_statisfied_flags;
-        vector<int> no_precond_diag_subsystem_indices;
+        std::vector<int> accuracy_statisfied_flags;
+        std::vector<int> no_precond_diag_subsystem_indices;
 
         // Containers
         SimSystemSlotCollection<DiagLinearSubsystem>    diag_subsystems;
@@ -328,10 +335,6 @@ class GlobalLinearSystem : public SimSystem
 
     // only be called by SimEngine::do_advance()
     void solve();
-
-    // only be called by SimEngine::do_backward()
-    // we just build a full hessian matrix for diff simulation
-    void prepare_hessian();
 
     Impl m_impl;
 };

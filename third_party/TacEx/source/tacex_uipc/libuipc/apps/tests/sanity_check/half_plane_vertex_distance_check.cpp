@@ -1,4 +1,4 @@
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <app/asset_dir.h>
 #include <app/require_log.h>
 #include <uipc/uipc.h>
@@ -55,7 +55,7 @@ void test_half_plane_vertex_distance_check(std::string_view name, std::string_vi
     REQUIRE(!world.is_valid());
 
     {
-        auto& msg  = scene.sanity_checker().errors().at(2);
+        auto& msg  = world.sanity_checker().errors().at(2);
         auto& mesh = msg->geometries().at("close_mesh");
 
         SimplicialComplexIO io;

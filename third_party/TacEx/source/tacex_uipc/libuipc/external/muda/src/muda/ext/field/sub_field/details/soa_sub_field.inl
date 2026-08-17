@@ -63,70 +63,21 @@ MUDA_INLINE void SubFieldImpl<FieldEntryLayout::SoA>::build_impl()
     m_copy_map_buffer = m_h_copy_map_buffer;
 }
 
-//namespace details
-//{
-//    void soa_map_copy(BufferView<SoACopyMap> copy_maps,
-//                      size_t                 base_strcut_stride,
-//                      uint32_t               base,
-//                      uint32_t               old_count_of_base,
-//                      uint32_t               new_count_of_base,
-//                      std::byte*             old_ptr,
-//                      std::byte*             new_ptr)
-//    {
-//        auto rounded_old_count = old_count_of_base * base;
-//        Memory().set(new_ptr, new_count_of_base * base_strcut_stride, 0).wait();
-//        ParallelFor(LIGHT_WORKLOAD_BLOCK_SIZE)
-//            .apply(old_count_of_base * base,
-//                   [old_ptr,
-//                    new_ptr,
-//                    rounded_old_count,
-//                    old_count_of_base,
-//                    new_count_of_base,
-//                    copy_maps = copy_maps.viewer()] __device__(int i) mutable
-//                   {
-//                       for(int j = 0; j < copy_maps.dim(); ++j)
-//                       {
-//                           auto map = copy_maps(j);
-//                           auto total_byte = rounded_old_count * map.elem_byte_size;  // the total byte
-//
-//                           auto old_offset_in_struct =
-//                               map.offset_in_base_struct * old_count_of_base;
-//
-//                           auto new_offset_in_struct =
-//                               map.offset_in_base_struct * new_count_of_base;
-//
-//                           for(int k = 0; k < map.elem_byte_size; ++k)
-//                           {
-//                               auto begin  = rounded_old_count * k;
-//                               auto offset = begin + i;
-//
-//                               auto old_offset = old_offset_in_struct + offset;
-//
-//                               auto new_offset = new_offset_in_struct + offset;
-//
-//                               new_ptr[new_offset] = old_ptr[old_offset];
-//                           }
-//                       }
-//                   })
-//            .wait();
-//    }
-//}  // namespace details
-
 MUDA_INLINE size_t SubFieldImpl<FieldEntryLayout::SoA>::require_total_buffer_byte_size(size_t num_elements)
 {
-    auto base              = m_build_options.max_alignment;
-    auto old_count_of_base = (m_num_elements + base - 1) / base;
+    auto base = m_build_options.max_alignment;
+    // auto old_count_of_base = (m_num_elements + base - 1) / base;
     auto new_count_of_base = (num_elements + base - 1) / base;
-    auto rounded_new_count = base * new_count_of_base;
-    auto total_bytes       = m_base_struct_stride * new_count_of_base;
+    // auto rounded_new_count = base * new_count_of_base;
+    auto total_bytes = m_base_struct_stride * new_count_of_base;
     return total_bytes;
 }
 
 MUDA_INLINE void SubFieldImpl<FieldEntryLayout::SoA>::calculate_new_cores(
     std::byte* byte_buffer, size_t total_bytes, size_t element_count, span<FieldEntryCore> new_cores)
 {
-    auto base              = m_build_options.max_alignment;
-    auto old_count_of_base = (m_num_elements + base - 1) / base;
+    auto base = m_build_options.max_alignment;
+    // auto old_count_of_base = (m_num_elements + base - 1) / base;
     auto new_count_of_base = (element_count + base - 1) / base;
     auto rounded_new_count = base * new_count_of_base;
 

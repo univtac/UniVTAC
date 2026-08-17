@@ -13,9 +13,14 @@
 # https://github.com/chuanyune/ManiSkill-ViTac2025/blob/a3d7df54bca9a2e57f34b37be3a3df36dc218915/Track_1/envs/tactile_sensor_sapienipc.py
 ##
 
+from __future__ import annotations
+
 import cv2
 import time
 import math
+import warnings
+from typing import TYPE_CHECKING
+
 import numpy as np
 import torch
 
@@ -26,7 +31,9 @@ from scipy.spatial import Delaunay
 import isaaclab.utils.math as math_utils
 
 from tacex_uipc.objects import UipcObject
-from tacex_uipc.sim import UipcSim
+
+if TYPE_CHECKING:
+    from tacex_uipc.sim import UipcSim
 
 from .utils.geometry import in_hull
 
@@ -81,6 +88,12 @@ class VisionTactileSensorUIPC:
         self.scene = self.uipc_sim.scene
 
         self.camera = camera
+        # The camera prim stays authored inside the GelSight USD.  In Isaac Sim
+        # 5.1, CameraData's XForm pose can remain at its authored value while a
+        # parent articulation moves in PhysX/Fabric.  The moving camera pose is
+        # reconstructed below from the rigid motion of the UIPC attachment
+        # vertices. Those vertices are the actual PhysX-to-UIPC coupling and
+        # therefore share the same world frame as the FEM marker vertices.
 
         if self.sensor_type not in CONSTRAIN_PTS:        
             gelpad_info = get_gelpad_info(self.gelpad_obj.uipc_meshes[0])
@@ -89,6 +102,8 @@ class VisionTactileSensorUIPC:
         else:
             self.constrain_ids = CONSTRAIN_PTS[self.sensor_type]
             self.faces_on_surfaces = SURFACE_FACES[self.sensor_type]
+        self._attachment_points_initial_w = self.get_vertices_world()[self.constrain_ids].clone()
+        self._camera_initial_pos_w, self._camera_initial_quat_w = self._authored_camera_pose_w()
         self.vertices_on_surface = np.sort(np.unique(self.faces_on_surfaces.flatten()))
         self.init_surface_vertices = self.get_surface_vertices_world()
 
@@ -140,20 +155,65 @@ class VisionTactileSensorUIPC:
         surf_v = all_v[self.vertices_on_surface]
         return surf_v
 
+    def _authored_camera_pose_w(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return the camera's initial USD-authored ROS/OpenCV world pose."""
+        # This method is also used while the TiledCamera PLAY callback is still
+        # initializing. Accessing ``camera.data`` there can force an annotator
+        # update before the articulation tensor callbacks have finished. The
+        # initialized pose buffer already contains the authored pose we need.
+        camera_data = self.camera._data
+        return camera_data.pos_w.clone(), camera_data.quat_w_ros.clone()
+
+    @staticmethod
+    def _estimate_rigid_motion(source: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """Estimate the rigid transform that maps source attachment points to target points."""
+        source_center = source.mean(dim=0)
+        target_center = target.mean(dim=0)
+        source_centered = source - source_center
+        target_centered = target - target_center
+        covariance = source_centered.transpose(0, 1) @ target_centered
+        u, _, vh = torch.linalg.svd(covariance)
+        v = vh.transpose(0, 1)
+        correction = torch.eye(3, dtype=source.dtype, device=source.device)
+        correction[-1, -1] = torch.where(
+            torch.linalg.det(v @ u.transpose(0, 1)) < 0,
+            -torch.ones((), dtype=source.dtype, device=source.device),
+            torch.ones((), dtype=source.dtype, device=source.device),
+        )
+        rotation = v @ correction @ u.transpose(0, 1)
+        translation = target_center - rotation @ source_center
+        return math_utils.make_pose(translation, rotation)
+
+    def get_camera_pose_world(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute the live ROS/OpenCV camera pose from attachment-point motion."""
+        current_attachment_points_w = self.get_vertices_world()[self.constrain_ids]
+        attachment_motion = self._estimate_rigid_motion(
+            self._attachment_points_initial_w,
+            current_attachment_points_w,
+        )
+        camera_initial_pose = math_utils.make_pose(
+            self._camera_initial_pos_w.to(dtype=attachment_motion.dtype),
+            math_utils.matrix_from_quat(self._camera_initial_quat_w).to(dtype=attachment_motion.dtype),
+        )
+        camera_pose_w = attachment_motion.unsqueeze(0) @ camera_initial_pose
+        camera_pos_w, camera_rotation_w = math_utils.unmake_pose(camera_pose_w)
+        return camera_pos_w, math_utils.quat_from_matrix(camera_rotation_w)
+
     # todo find out what's wrong with this method -> frame coor. sys. seems to be wrong
     def transform_camera_to_world_frame(self, input_vertices):
-        self.camera._update_poses(self.camera._ALL_INDICES)
-        # math_utils.convert_camera_frame_orientation_convention
-        cam_pos_w = self.camera._data.pos_w
-        cam_quat_w = self.camera._data.quat_w_ros  # quat_w_opengl#quat_w_world
+        cam_pos_w, cam_quat_w = self.get_camera_pose_world()
         v_cv = math_utils.transform_points(input_vertices, pos=cam_pos_w, quat=cam_quat_w)
         return v_cv
 
-    def transform_world_to_camera_frame(self, input_vertices):
-        self.camera._update_poses(self.camera._ALL_INDICES)
-        # math_utils.convert_camera_frame_orientation_convention
-        cam_pos_w = self.camera._data.pos_w
-        cam_quat_w = self.camera._data.quat_w_ros
+    def transform_world_to_camera_frame(self, input_vertices, camera_pose_w=None):
+        if camera_pose_w is None:
+            camera_pose_w = self.get_camera_pose_world()
+        cam_pos_w, cam_quat_w = camera_pose_w
+        if cam_pos_w.shape[0] != 1:
+            raise NotImplementedError(
+                "FEM marker projection currently supports num_envs=1; "
+                f"received {cam_pos_w.shape[0]} camera poses."
+            )
         cam_quat_w_inv = math_utils.quat_inv(cam_quat_w)
 
         rot_inv = math_utils.matrix_from_quat(cam_quat_w_inv)
@@ -161,9 +221,10 @@ class VisionTactileSensorUIPC:
         if rot_inv.dim() == 2:
             rot_inv = rot_inv[None]  # (3, 3) -> (1, 3, 3)
 
-        t_target = input_vertices - cam_pos_w
-        # convert to batched #todo fix it for multi env
-        t_target = t_target[None, :, :]  # (N, 3) -> (N, 1, 3)
+        t_target = input_vertices - cam_pos_w[0]
+        # convert to batched; UIPC marker extraction is intentionally limited
+        # to one environment until cloned UIPC meshes are supported.
+        t_target = t_target[None, :, :]
 
         v_cv = torch.matmul(rot_inv.to(torch.float64), t_target.transpose_(1, 2))
         v_cv = v_cv.transpose_(1, 2)
@@ -187,14 +248,14 @@ class VisionTactileSensorUIPC:
         v_cv = self.transform_to_init_gelpad_frame(v)
         return v_cv
 
-    def get_vertices_camera(self):
+    def get_vertices_camera(self, camera_pose_w=None):
         v = self.get_vertices_world()
-        v_cv = self.transform_world_to_camera_frame(v)
+        v_cv = self.transform_world_to_camera_frame(v, camera_pose_w=camera_pose_w)
         return v_cv
 
-    def get_surface_vertices_camera(self):
+    def get_surface_vertices_camera(self, camera_pose_w=None):
         v = self.get_surface_vertices_world()
-        v_cv = self.transform_world_to_camera_frame(v)
+        v_cv = self.transform_world_to_camera_frame(v, camera_pose_w=camera_pose_w)
         return v_cv
 
     def set_reference_surface_vertices_camera(self):
@@ -258,7 +319,31 @@ class VisionTactileSensorUIPC:
         simplex_idx = tri.find_simplex(marker_pts, tol=1e-5)
         valid_marker_idx = np.flatnonzero(simplex_idx >= 0).astype(np.int32)
         if valid_marker_idx.size != marker_pts.shape[0]:
-            raise RuntimeError("Some marker points are outside the convex hull of the surface vertices!")
+            # The nominal GS Mini marker grid reaches within a few microns of
+            # the FEM surface bounds.  Rounded/tetrahedralized corners can put
+            # only the outer marker centres outside the actual convex hull.
+            # Preserve every marker and avoid extrapolated barycentric weights
+            # by applying the smallest bounded, uniform inset that fits.
+            for scale in np.arange(0.999, 0.979, -0.001):
+                inset_marker_pts = marker_pts * scale
+                inset_simplex_idx = tri.find_simplex(inset_marker_pts, tol=1e-5)
+                if np.all(inset_simplex_idx >= 0):
+                    warnings.warn(
+                        f"Inset FEM marker grid by {(1.0 - scale) * 100:.2f}% to fit the gel surface.",
+                        RuntimeWarning,
+                    )
+                    marker_pts = inset_marker_pts
+                    simplex_idx = inset_simplex_idx
+                    valid_marker_idx = np.arange(marker_pts.shape[0], dtype=np.int32)
+                    break
+            else:
+                raise RuntimeError(
+                    "Some marker points are outside the convex hull of the surface vertices: "
+                    f"surface_xy=[{surface_pts.min(axis=0)}, {surface_pts.max(axis=0)}], "
+                    f"marker_xy=[{marker_pts.min(axis=0)}, {marker_pts.max(axis=0)}], "
+                    f"camera_pos={self.get_camera_pose_world()[0]}, "
+                    f"camera_quat_ros={self.get_camera_pose_world()[1]}"
+                )
 
         marker_pts = marker_pts[valid_marker_idx]
         valid_simplex_idx = simplex_idx[valid_marker_idx]
@@ -290,17 +375,21 @@ class VisionTactileSensorUIPC:
         return marker_uv
 
     def gen_marker_flow(self):
+        camera_pose_w = self.get_camera_pose_world()
         init_marker_pts = (
             self.reference_surface_vertices_camera[self.marker_surf_idx].cpu().numpy()
             * self.marker_weight[..., None]
         ).sum(1)
         curr_marker_pts = (
-            self.get_surface_vertices_camera()[self.marker_surf_idx].cpu().numpy()
+            self.get_surface_vertices_camera(camera_pose_w=camera_pose_w)[self.marker_surf_idx].cpu().numpy()
             * self.marker_weight[..., None]
         ).sum(1)
 
         mean_motion = np.mean(
-            self.get_vertices_camera()[self.constrain_ids].cpu().numpy() - self.constrain_pts, axis=0)
+            self.get_vertices_camera(camera_pose_w=camera_pose_w)[self.constrain_ids].cpu().numpy()
+            - self.constrain_pts,
+            axis=0,
+        )
         curr_marker_pts[:, :2] -= mean_motion[:2]
 
         init_marker_uv = self.gen_marker_uv(init_marker_pts)

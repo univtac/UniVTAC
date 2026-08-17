@@ -12,7 +12,7 @@ from .xensews_cfg import GelSightMiniCfg
 GELSIGHT_MINI_TAXIM_FEM_CFG = GelSightMiniCfg()
 GELSIGHT_MINI_TAXIM_FEM_CFG = GELSIGHT_MINI_TAXIM_FEM_CFG.replace(
     sensor_camera_cfg=GelSightSensorCfg.SensorCameraCfg(
-        prim_path_appendix="/Camera",
+        prim_name="Camera",
         update_period=0,
         resolution=(32, 24),
         data_types=["depth"],

@@ -1,12 +1,14 @@
 #pragma once
 #include <sim_system.h>
 #include <contact_system/global_contact_manager.h>
+#include <dytopo_effect_system/dytopo_effect_reporter.h>
+
 namespace uipc::backend::cuda
 {
-class ContactReporter : public SimSystem
+class ContactReporter : public DyTopoEffectReporter
 {
   public:
-    using SimSystem::SimSystem;
+    using DyTopoEffectReporter::DyTopoEffectReporter;
 
     class BuildInfo
     {
@@ -18,21 +20,23 @@ class ContactReporter : public SimSystem
       public:
     };
 
+    class Impl
+    {
+      public:
+        muda::CBufferView<Float>           energies;
+        muda::CDoubletVectorView<Float, 3> gradients;
+        muda::CTripletMatrixView<Float, 3> hessians;
+    };
+
   protected:
     virtual void do_build(BuildInfo& info) = 0;
-    virtual void do_init(InitInfo&);
-    virtual void do_report_extent(GlobalContactManager::ContactExtentInfo& info) = 0;
-    virtual void do_assemble(GlobalContactManager::ContactInfo& info)      = 0;
-    virtual void do_compute_energy(GlobalContactManager::EnergyInfo& info) = 0;
+    virtual void do_init(InitInfo& info);
 
   private:
     friend class GlobalContactManager;
-    friend class ContactLineSearchReporter;
     void  init();  // only be called by GlobalContactManager
-    void  do_build() final override;
-    void  report_extent(GlobalContactManager::ContactExtentInfo& info);
-    void  assemble(GlobalContactManager::ContactInfo& info);
-    void  compute_energy(GlobalContactManager::EnergyInfo& info);
+    void  do_build(DyTopoEffectReporter::BuildInfo&) final override;
     SizeT m_index = ~0ull;
+    Impl  m_impl;
 };
 }  // namespace uipc::backend::cuda

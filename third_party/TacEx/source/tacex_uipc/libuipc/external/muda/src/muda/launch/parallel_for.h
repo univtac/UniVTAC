@@ -82,10 +82,10 @@ class ParallelForDetails
 
   private:
     template <typename F, typename UserTag>
-    friend MUDA_GLOBAL void details::parallel_for_kernel(ParallelForCallable<F> f);
+    friend MUDA_GLOBAL void details::parallel_for_kernel(details::ParallelForCallable<F> f);
 
     template <typename F, typename UserTag>
-    friend MUDA_GLOBAL void details::grid_stride_loop_kernel(ParallelForCallable<F> f);
+    friend MUDA_GLOBAL void details::grid_stride_loop_kernel(details::ParallelForCallable<F> f);
 
     MUDA_DEVICE ParallelForDetails(ParallelForType type, int i, int total_num) MUDA_NOEXCEPT
         : m_type(type),
@@ -169,6 +169,7 @@ class ParallelFor : public LaunchBase<ParallelFor>
           m_block_dim(blockDim),
           m_shared_mem_size(shared_mem_size)
     {
+        // std::cout << "[DEBUG]" << "blockDim: " << blockDim << std::endl;
     }
 
 

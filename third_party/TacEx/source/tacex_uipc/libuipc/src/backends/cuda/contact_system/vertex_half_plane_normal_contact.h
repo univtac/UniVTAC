@@ -2,6 +2,7 @@
 #include <contact_system/contact_reporter.h>
 #include <line_search/line_searcher.h>
 #include <contact_system/contact_coeff.h>
+#include <implicit_geometry/half_plane_vertex_reporter.h>
 
 namespace uipc::backend::cuda
 {
@@ -31,9 +32,12 @@ class VertexHalfPlaneNormalContact : public ContactReporter
         muda::CBufferView<Vector3>        rest_positions() const;
         muda::CBufferView<Float>          thicknesses() const;
         muda::CBufferView<IndexT>         contact_element_ids() const;
+        muda::CBufferView<IndexT>         subscene_element_ids() const;
         Float                             d_hat() const;
+        muda::CBufferView<Float>          d_hats() const;
         Float                             dt() const;
         Float                             eps_velocity() const;
+        IndexT                            half_plane_vertex_offset() const;
 
       private:
         friend class VertexHalfPlaneNormalContact;
@@ -87,24 +91,20 @@ class VertexHalfPlaneNormalContact : public ContactReporter
         SimSystemSlot<GlobalContactManager>   global_contact_manager;
         SimSystemSlot<GlobalVertexManager>    global_vertex_manager;
         SimSystemSlot<VertexHalfPlaneTrajectoryFilter> veretx_half_plane_trajectory_filter;
+        SimSystemSlot<HalfPlaneVertexReporter> vertex_reporter;
 
         SizeT PH_count = 0;
-        Float dt;
+        Float dt       = 0.0;
 
-        muda::DeviceBuffer<Float> energies;
-
-        Float reserve_ratio = 1.1;
-
-        template <typename T>
-        void loose_resize(muda::DeviceBuffer<T>& buffer, SizeT size)
-        {
-            if(size > buffer.capacity())
-            {
-                buffer.reserve(size * reserve_ratio);
-            }
-            buffer.resize(size);
-        }
+        muda::CBufferView<Float>           energies;
+        muda::CDoubletVectorView<Float, 3> gradients;
+        muda::CTripletMatrixView<Float, 3> hessians;
     };
+
+    muda::CBufferView<Vector2i>        PHs() const noexcept;
+    muda::CBufferView<Float>           energies() const noexcept;
+    muda::CDoubletVectorView<Float, 3> gradients() const noexcept;
+    muda::CTripletMatrixView<Float, 3> hessians() const noexcept;
 
   protected:
     virtual void do_build(BuildInfo& info)           = 0;
@@ -112,9 +112,11 @@ class VertexHalfPlaneNormalContact : public ContactReporter
     virtual void do_assemble(ContactInfo& info)      = 0;
 
   private:
+    virtual void do_report_energy_extent(GlobalContactManager::EnergyExtentInfo& info) override final;
     virtual void do_compute_energy(GlobalContactManager::EnergyInfo& info) override final;
-    virtual void do_report_extent(GlobalContactManager::ContactExtentInfo& info) override final;
-    virtual void do_assemble(GlobalContactManager::ContactInfo& info) override final;
+    virtual void do_report_gradient_hessian_extent(
+        GlobalContactManager::GradientHessianExtentInfo& info) override final;
+    virtual void do_assemble(GlobalContactManager::GradientHessianInfo& info) override final;
     virtual void do_build(ContactReporter::BuildInfo& info) override final;
 
     Impl m_impl;

@@ -13,58 +13,6 @@
 
 namespace uipc::sanity_check
 {
-void ContactTabular::init(backend::SceneVisitor& scene)
-{
-    auto contact_models = scene.contact_tabular().contact_models();
-    auto elements       = scene.contact_tabular().element_count();
-
-    auto attr_topo          = contact_models.find<Vector2i>("topo");
-    auto attr_resistance    = contact_models.find<Float>("resistance");
-    auto attr_friction_rate = contact_models.find<Float>("friction_rate");
-    auto attr_enabled       = contact_models.find<IndexT>("is_enabled");
-
-    UIPC_ASSERT(attr_topo != nullptr, "topo is not found in contact tabular");
-    UIPC_ASSERT(attr_resistance != nullptr, "resistance is not found in contact tabular");
-    UIPC_ASSERT(attr_friction_rate != nullptr, "friction_rate is not found in contact tabular");
-    UIPC_ASSERT(attr_enabled != nullptr, "is_enabled is not found in contact tabular");
-
-    auto topo_view          = attr_topo->view();
-    auto resistance_view    = attr_resistance->view();
-    auto friction_rate_view = attr_friction_rate->view();
-    auto enabled_view       = attr_enabled->view();
-
-    auto default_model = scene.contact_tabular().default_model();
-
-    m_table.resize(elements * elements, default_model);
-    m_contact_element_count = elements;
-    for(auto&& [topo, resistance, friction_rate, enabled] :
-        zip(topo_view, resistance_view, friction_rate_view, enabled_view))
-    {
-        auto model = core::ContactModel{
-            topo, friction_rate, resistance, enabled ? true : false, Json::object()};
-
-        m_table[topo.x() * elements + topo.y()] = model;
-        m_table[topo.y() * elements + topo.x()] = model;
-    }
-}
-
-const core::ContactModel& ContactTabular::at(IndexT i, IndexT j) const
-{
-    UIPC_ASSERT(i < m_contact_element_count && j < m_contact_element_count,
-                "Invalid contact element id, id should be in [{},{}), your i={}, j={}.",
-                0,
-                m_contact_element_count,
-                i,
-                j);
-
-    return m_table[i * m_contact_element_count + j];
-}
-
-SizeT ContactTabular::element_count() const noexcept
-{
-    return m_contact_element_count;
-}
-
 namespace detail
 {
     using namespace uipc::geometry;
@@ -196,6 +144,32 @@ namespace detail
 
                     std::ranges::fill(view(*dim_attr), dim);
                 }
+
+                // 4) label vertices with self_collision
+                {
+                    auto sanity_check_self_collision =
+                        simplicial_complex->vertices().find<IndexT>("sanity_check/self_collision");
+                    if(!sanity_check_self_collision)
+                        sanity_check_self_collision =
+                            simplicial_complex->vertices().create<IndexT>(
+                                "sanity_check/self_collision", 0);
+                    auto sanity_check_self_collision_view =
+                        view(*sanity_check_self_collision);
+
+                    auto self_collision =
+                        simplicial_complex->meta().find<IndexT>(builtin::self_collision);
+
+                    if(self_collision)
+                    {
+                        std::ranges::fill(sanity_check_self_collision_view,
+                                          self_collision->view()[0]);
+                    }
+                    else
+                    {
+                        // if self_collision is not set, we assume no self collision
+                        std::ranges::fill(sanity_check_self_collision_view, 0);
+                    }
+                }
             }
 
             if(geo.type() == builtin::ImplicitGeometry)
@@ -223,8 +197,12 @@ namespace detail
         }
     }
 
-    static void label_vertices_with_contact_info(span<S<GeometrySlot>> geos)
+    static void label_vertices_with_contact_info(backend::SceneVisitor& sv)
     {
+        auto  d_hat_attr           = sv.config().find<Float>("contact/d_hat");
+        Float default_d_hat        = d_hat_attr->view()[0];
+        span<S<GeometrySlot>> geos = sv.geometries();
+
         for(auto& geo : geos)
         {
             if(geo->geometry().type() == builtin::SimplicialComplex)
@@ -236,14 +214,22 @@ namespace detail
                 // 1) Contact Element ID
                 auto contact_element_id =
                     simplicial_complex->meta().find<IndexT>(builtin::contact_element_id);
+                auto subscene_contact_element_id =
+                    simplicial_complex->meta().find<IndexT>(builtin::subscene_element_id);
                 auto v_is_surf =
                     simplicial_complex->vertices().find<IndexT>(builtin::is_surf);
 
                 IndexT CID        = 0;
                 bool   need_label = false;
 
+                IndexT SCID                = 0;
+                bool   need_subscene_label = false;
+
                 if(v_is_surf && !contact_element_id)
                     need_label = true;
+
+                if(v_is_surf && !subscene_contact_element_id)
+                    need_subscene_label = true;
 
                 if(contact_element_id)
                 {
@@ -251,17 +237,103 @@ namespace detail
                     need_label = true;
                 }
 
+                if(subscene_contact_element_id)
+                {
+                    SCID = subscene_contact_element_id->view()[0];
+                    need_subscene_label = true;
+                }
+
+
+                if(need_subscene_label)
+                {
+                    auto sanity_vertex_subscene_contact_element_id =
+                        simplicial_complex->vertices().find<IndexT>(
+                            "sanity_check/subscene_contact_element_id");
+
+                    if(!sanity_vertex_subscene_contact_element_id)
+                    {
+                        sanity_vertex_subscene_contact_element_id =
+                            simplicial_complex->vertices().create<IndexT>(
+                                "sanity_check/subscene_contact_element_id", 0);
+                    }
+
+                    auto vertex_subscene_contact_element_id =
+                        simplicial_complex->vertices().find<IndexT>(builtin::subscene_element_id);
+
+                    // if vertex subscene contact_element_id does not exist, label all surface vertices with `meta` contact_element_id
+                    if(!vertex_subscene_contact_element_id)
+                    {
+                        std::ranges::fill(view(*sanity_vertex_subscene_contact_element_id), SCID);
+                    }
+                    else  // copy from vertex_subscene_contact_element_id
+                    {
+                        auto src_view = vertex_subscene_contact_element_id->view();
+                        auto dst_view = view(*sanity_vertex_subscene_contact_element_id);
+
+                        std::ranges::copy(src_view, dst_view.begin());
+                    }
+                }
+
                 if(need_label)
                 {
-                    auto vertex_contact_element_id =
+                    /****************************************************************************
+                    *                           contact_element_id
+                    ****************************************************************************/
+
+                    auto sanity_vertex_contact_element_id =
                         simplicial_complex->vertices().find<IndexT>("sanity_check/contact_element_id");
 
-                    if(!vertex_contact_element_id)
-                        vertex_contact_element_id =
+                    if(!sanity_vertex_contact_element_id)
+                    {
+                        sanity_vertex_contact_element_id =
                             simplicial_complex->vertices().create<IndexT>(
                                 "sanity_check/contact_element_id", 0);
+                    }
 
-                    std::ranges::fill(view(*vertex_contact_element_id), CID);
+
+                    auto vertex_contact_element_id =
+                        simplicial_complex->vertices().find<IndexT>(builtin::contact_element_id);
+
+                    // if vertex contact_element_id does not exist, label all surface vertices with `meta` contact_element_id
+                    if(!vertex_contact_element_id)
+                    {
+                        std::ranges::fill(view(*sanity_vertex_contact_element_id), CID);
+                    }
+                    else  // copy from vertex_contact_element_id
+                    {
+                        auto src_view = vertex_contact_element_id->view();
+                        auto dst_view = view(*sanity_vertex_contact_element_id);
+
+                        std::ranges::copy(src_view, dst_view.begin());
+                    }
+
+                    /****************************************************************************
+                    *                           d_hat
+                    ****************************************************************************/
+
+                    auto d_hat_attr =
+                        simplicial_complex->meta().find<Float>(builtin::d_hat);
+
+                    auto vertex_d_hat_attr =
+                        simplicial_complex->vertices().find<Float>("sanity_check/d_hat");
+
+                    if(!vertex_d_hat_attr)
+                    {
+                        vertex_d_hat_attr =
+                            simplicial_complex->vertices().create<Float>("sanity_check/d_hat",
+                                                                         0.0);
+                    }
+
+                    auto vertex_d_hat_view = view(*vertex_d_hat_attr);
+
+                    if(d_hat_attr)
+                    {
+                        std::ranges::fill(vertex_d_hat_view, d_hat_attr->view()[0]);
+                    }
+                    else
+                    {
+                        std::ranges::fill(vertex_d_hat_view, default_d_hat);
+                    }
                 }
             }
         }
@@ -340,21 +412,25 @@ namespace detail
         vector<SimplicialComplex> all_surfaces;
         all_surfaces.reserve(total_surface_instances);
 
+        IndexT InstId = 0;
+
         for(auto& surface : surfaces)
         {
             vector<SimplicialComplex> instances = apply_transform(surface);
 
-            // label vertices with instance id
+
             for(auto&& [I, instance] : enumerate(instances))
             {
+                // label vertices with instance id
                 auto instance_id =
                     instance.vertices().find<IndexT>("sanity_check/instance_id");
 
                 if(!instance_id)
                     instance_id = instance.vertices().create<IndexT>("sanity_check/instance_id");
 
-                std::ranges::fill(view(*instance_id), I);
+                std::ranges::fill(view(*instance_id), InstId++);
             }
+
 
             std::move(instances.begin(), instances.end(), std::back_inserter(all_surfaces));
         }
@@ -374,7 +450,7 @@ class Context::Impl
 {
   public:
     Impl(core::internal::Scene& s) noexcept
-        : m_scene(s)
+        : m_scene(s.shared_from_this())
     {
     }
 
@@ -382,39 +458,35 @@ class Context::Impl
 
     void prepare()
     {
-        auto scene_visitor = backend::SceneVisitor{m_scene};
-        m_contact_tabular.init(scene_visitor);
-
         build_geo_id_to_object_id();
+
+        auto scene_visitor = backend::SceneVisitor{*m_scene};
 
         detail::create_basic_sanity_check_attributes(scene_visitor.geometries(),
                                                      m_geo_id_to_object_id);
 
-        auto& info           = scene_visitor.info();
-        auto  enable_contact = info["contact"]["enable"].get<bool>();
-        if(enable_contact)
+        auto enable_contact = scene_visitor.config().find<IndexT>("contact/enable");
+        if(enable_contact->view()[0])
         {
-            detail::label_vertices_with_contact_info(scene_visitor.geometries());
+            detail::label_vertices_with_contact_info(scene_visitor);
         }
     }
 
     void destroy()
     {
-        auto scene_visitor = backend::SceneVisitor{m_scene};
+        auto scene_visitor = backend::SceneVisitor{*m_scene};
         detail::destory_sanity_check_attributes(scene_visitor);
     }
 
     void build_geo_id_to_object_id() const noexcept
     {
-        auto scene_visitor = backend::SceneVisitor{m_scene};
-
-        auto N = m_scene.objects().size();
+        auto N = m_scene->objects().size();
 
         auto& map = m_geo_id_to_object_id;
 
         for(IndexT objI = 0; objI < N; ++objI)
         {
-            auto obj = m_scene.objects().find(objI);
+            auto obj = m_scene->objects().find(objI);
             if(obj)
             {
                 auto geo_ids = obj->geometries().ids();
@@ -431,7 +503,7 @@ class Context::Impl
         if(m_scene_simplicial_surface)
             return *m_scene_simplicial_surface;
 
-        auto scene_visitor = backend::SceneVisitor{m_scene};
+        auto scene_visitor = backend::SceneVisitor{*m_scene};
 
         m_scene_simplicial_surface = uipc::make_unique<geometry::SimplicialComplex>();
 
@@ -448,22 +520,20 @@ class Context::Impl
         return *m_scene_simplicial_surface;
     }
 
-    void init_contact_tabular(ContactTabular& contact_tabular) const
+    const core::ContactTabular& contact_tabular() const noexcept
     {
-        auto scene_visitor = backend::SceneVisitor{m_scene};
-        contact_tabular.init(scene_visitor);
+        return m_scene->contact_tabular();
     }
 
-    const ContactTabular& contact_tabular() const noexcept
+    const core::SubsceneTabular& subscene_tabular() const noexcept
     {
-        return m_contact_tabular;
+        return m_scene->subscene_tabular();
     }
 
   private:
-    core::internal::Scene&                 m_scene;
+    S<core::internal::Scene>               m_scene;
     mutable U<geometry::SimplicialComplex> m_scene_simplicial_surface;
     mutable unordered_map<IndexT, IndexT>  m_geo_id_to_object_id;
-    ContactTabular                         m_contact_tabular;
 };
 
 Context::Context(SanityCheckerCollection& c, core::internal::Scene& s) noexcept
@@ -489,9 +559,14 @@ const geometry::SimplicialComplex& Context::scene_simplicial_surface() const noe
     return m_impl->scene_simplicial_surface();
 }
 
-const ContactTabular& Context::contact_tabular() const noexcept
+const core::ContactTabular& Context::contact_tabular() const noexcept
 {
     return m_impl->contact_tabular();
+}
+
+const core::SubsceneTabular& Context::subscene_tabular() const noexcept
+{
+    return m_impl->subscene_tabular();
 }
 
 U64 Context::get_id() const noexcept

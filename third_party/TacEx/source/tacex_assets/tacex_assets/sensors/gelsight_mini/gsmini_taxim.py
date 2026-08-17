@@ -1,16 +1,16 @@
 from tacex import GelSightSensorCfg
 from tacex.simulation_approaches.gpu_taxim import TaximSimulatorCfg
 
-from tacex_assets import TACEX_ASSETS_DATA_DIR
+from tacex_assets import TACEX_SENSORS_DATA_DIR
 
-from .gsmini_cfg import GelSightMiniCfg
+from .generic_gsmini_cfg import GeneralGelSightMiniCfg
 
 """Configuration for simulating the Gelsight Mini via GPU-Taxim."""
 
-GELSIGHT_MINI_TAXIM_CFG = GelSightMiniCfg()
+GELSIGHT_MINI_TAXIM_CFG = GeneralGelSightMiniCfg()
 GELSIGHT_MINI_TAXIM_CFG = GELSIGHT_MINI_TAXIM_CFG.replace(
     sensor_camera_cfg=GelSightSensorCfg.SensorCameraCfg(
-        prim_path_appendix="/Camera",
+        prim_name="Camera",
         update_period=0,
         resolution=(320, 240),
         data_types=["depth"],
@@ -19,7 +19,7 @@ GELSIGHT_MINI_TAXIM_CFG = GELSIGHT_MINI_TAXIM_CFG.replace(
     update_period=0.01,
     data_types=["tactile_rgb"],
     optical_sim_cfg=TaximSimulatorCfg(
-        calib_folder_path=f"{TACEX_ASSETS_DATA_DIR}/Sensors/GelSight_Mini/calibs/640x480",
+        calib_folder_path=f"{TACEX_SENSORS_DATA_DIR}/GelSight_Mini/calibs/640x480",
         gelpad_height=GELSIGHT_MINI_TAXIM_CFG.gelpad_dimensions.height,
         gelpad_to_camera_min_distance=0.024,
         with_shadow=False,
@@ -44,7 +44,7 @@ GELSIGHT_MINI_TAXIM_CFG = GELSIGHT_MINI_TAXIM_CFG.replace(
 #     )
 
 #     sensor_camera_cfg: GelSightSensorCfg.SensorCameraCfg = GelSightSensorCfg.SensorCameraCfg(
-#         prim_path_appendix="/Camera",
+#         prim_name="Camera",
 #         update_period=0,
 #         resolution=(320, 240),
 #         data_types=["depth"],
@@ -67,7 +67,7 @@ GELSIGHT_MINI_TAXIM_CFG = GELSIGHT_MINI_TAXIM_CFG.replace(
 #     """
 
 #     optical_sim_cfg = TaximSimulatorCfg(
-#         calib_folder_path=f"{TACEX_ASSETS_DATA_DIR}/Sensors/GelSight_Mini/calibs/640x480",
+#         calib_folder_path=f"{TACEX_ASSETS_DATA_DIR}/Sensors/GelSight_Mini/calibs/taxim/640x480",
 #         gelpad_height=gelpad_dimensions.height,
 #         gelpad_to_camera_min_distance=0.024,
 #         with_shadow=False,

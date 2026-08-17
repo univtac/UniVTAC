@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import cv2
 import omni.usd
 
-from tacex_uipc import UipcObject
+from tacex_uipc.objects import UipcObject
 
 from ...gelsight_sensor import GelSightSensor
 from ..gelsight_simulator import GelSightSimulator
@@ -37,6 +37,7 @@ class ManiSkillSimulator(GelSightSimulator):
         self.camera = None
         self.gelpad_uipc: UipcObject = self.sensor.gelpad_obj
         self.radius = cfg.marker_radius
+        self._patch_device = cfg.device or sensor.device
         self.draw_patch_array()
 
         super().__init__(sensor=sensor, cfg=cfg)
@@ -291,7 +292,7 @@ class ManiSkillSimulator(GelSightSimulator):
                     patch_array[u, v, w, ...] = img_lowres
 
         ManiSkillSimulator.patch_array = torch.tensor(
-            patch_array, dtype=torch.uint8, device="cuda:0"
+            patch_array, dtype=torch.uint8, device=self._patch_device
         )
         # 保存参数供 draw_markers 使用
         ManiSkillSimulator.patch_params = {
@@ -300,7 +301,13 @@ class ManiSkillSimulator(GelSightSimulator):
             "super_resolution_ratio": super_resolution_ratio,
         }
 
-    def draw_markers(self, marker_uv: torch.Tensor) -> torch.Tensor:
+    def draw_markers(
+        self,
+        marker_uv: torch.Tensor | np.ndarray,
+        marker_size: int | None = None,
+        img_w: int | None = None,
+        img_h: int | None = None,
+    ) -> torch.Tensor:
         """Visualize the marker flow like the ManiSkill-ViTac Simulator does.
 
         Reference:
@@ -315,7 +322,10 @@ class ManiSkillSimulator(GelSightSimulator):
         Returns:
             Image with the markers visualized as dots.
         """
-        device = "cuda:0"
+        device = self._device
+        marker_uv = torch.as_tensor(marker_uv, dtype=torch.float32, device=device)
+        img_w = self.cfg.tactile_img_res[0] if img_w is None else img_w
+        img_h = self.cfg.tactile_img_res[1] if img_h is None else img_h
         params = ManiSkillSimulator.patch_params
         circle_radius = params["circle_radius"]
         base_circle_radius = params["base_circle_radius"]
@@ -324,7 +334,7 @@ class ManiSkillSimulator(GelSightSimulator):
         pad_size = 2 * circle_radius
         patch_size = 4 * circle_radius
         
-        marker_image = torch.ones((self.cfg.tactile_img_res[1], self.cfg.tactile_img_res[0]),
+        marker_image = torch.ones((img_h, img_w),
                                dtype=torch.float32, device=device) * 255
         marker_image = torch.nn.functional.pad(
             marker_image, (pad_size, pad_size, pad_size, pad_size), mode='constant', value=255)
@@ -337,11 +347,11 @@ class ManiSkillSimulator(GelSightSimulator):
         
         patch_id_u = torch.floor(u_frac * super_resolution_ratio).long().clamp(0, super_resolution_ratio - 1)
         patch_id_v = torch.floor(v_frac * super_resolution_ratio).long().clamp(0, super_resolution_ratio - 1)
-        marker_size = circle_radius
+        marker_size = circle_radius if marker_size is None else marker_size
         patch_id_w = int((marker_size - base_circle_radius) * super_resolution_ratio)
         patch_id_w = max(0, min(patch_id_w, 49))  # clamp to [0, size_slot_num - 1]
 
-        patches = ManiSkillSimulator.patch_array[patch_id_u, patch_id_v, patch_id_w, :, :]
+        patches = ManiSkillSimulator.patch_array[patch_id_u, patch_id_v, patch_id_w, :, :].to(device)
         
         for i in range(len(patches)):
             u_start = u_floor[i].item() - pad_size

@@ -26,8 +26,6 @@ class TaximSimulator(GelSightSimulator):
     cfg: TaximSimulatorCfg
 
     def __init__(self, sensor: GelSightSensor, cfg: TaximSimulatorCfg):
-        self.sensor = sensor
-
         super().__init__(sensor=sensor, cfg=cfg)
 
     def _initialize_impl(self):
@@ -40,7 +38,6 @@ class TaximSimulator(GelSightSimulator):
             self._device = self.cfg.device
 
         self._num_envs = self.sensor._num_envs
-        # todo make size adaptable? I mean with env_ids. This way we would always simulate everything
         self._indentation_depth = torch.zeros((self.sensor._num_envs), device=self.sensor._device)
         """Indentation depth, i.e. how deep the object is pressed into the gelpad.
         Values are in mm.
@@ -48,18 +45,15 @@ class TaximSimulator(GelSightSimulator):
         Indentation depth is equal to the maximum pressing depth of the object in the gelpad.
         It is used for shifting the height map for the Taxim simulation.
         """
+
         self.tactile_rgb_img = torch.zeros(
             (self.sensor._num_envs, self.cfg.tactile_img_res[1], self.cfg.tactile_img_res[0], 3),
             device=self._device,
         )
 
-        self._taxim: Taxim = Taxim(calib_folder=calib_folder, device=self._device, backend='torch')
-        # update Taxim settings via settings from cfg class
-        # print(self._taxim.width)
-        # self._taxim.width = self.cfg.tactile_img_res[0]
-        # self._taxim.height = self.cfg.tactile_img_res[1]
+        self._taxim: Taxim = Taxim(calib_folder=calib_folder, device=self._device, params=self.cfg.taxim_parameters)
 
-        # -- note Taxim sim uses (channels, height, width) format
+        # -- NOTE: Taxim sim uses (channels, height, width) format
 
         # tactile rgb image without indentation
         self.background_img = self._taxim.background_img
@@ -80,7 +74,7 @@ class TaximSimulator(GelSightSimulator):
     def optical_simulation(self):
         """Returns simulation output of Taxim optical simulation.
 
-        Images have the shape (num_envs, height, width, channels) and values in range [0,255].
+        Images have the shape (num_envs, height, width, channels) and values in range [0, 255].
         """
         height_map = self.sensor._data.output["height_map"]
 
@@ -104,30 +98,25 @@ class TaximSimulator(GelSightSimulator):
         self.tactile_rgb_img[:] = self._taxim.render_direct(
             height_map[:],
             with_shadow=self.cfg.with_shadow,
-            press_depth=self._indentation_depth,
+            press_depth=self.sensor._indentation_depth,
             orig_hm_fmt=False,
-        ).movedim(
-            1, 3
-        )  # *255).type(torch.uint8)
+        ).movedim(1, 3)  # *255).type(torch.uint8)
 
         return self.tactile_rgb_img
 
     def compute_indentation_depth(self):
-        height_map = self.sensor._data.output["height_map"] / 1000  # convert height map from mm to meter
-        min_distance_obj = height_map.amin((1, 2))
-        # smallest distance between object and sensor case
-        dist_obj_sensor_case = min_distance_obj - self.cfg.gelpad_to_camera_min_distance
+        height_map = self.sensor._data.output["height_map"]
+        # for old height map
+        # min_distance_obj = height_map.amin((1, 2))
+        # # smallest distance between object and sensor case
+        # dist_obj_sensor_case = min_distance_obj - self.cfg.gelpad_to_camera_min_distance * 1000
+        # dist_obj_sensor_case = torch.where(dist_obj_sensor_case < 0, 0, dist_obj_sensor_case)
 
-        # print("dist_obj_sensor_case", dist_obj_sensor_case)
-        # if (dist_obj_sensor_case < 0):  # object is "inside the sensor", cause the object is closer to the camera than the edge of the sensor
-        #     # print("Object is inside the sensor!!! Gelpad would be broken!!!")
-        #     dist_obj_sensor_case = 0
-        dist_obj_sensor_case = torch.where(dist_obj_sensor_case < 0, 0, dist_obj_sensor_case)
+        # self._indentation_depth[:] = torch.where(
+        #     dist_obj_sensor_case <= self.cfg.gelpad_height, (self.cfg.gelpad_height * 1000 - dist_obj_sensor_case), 0
+        # )
 
-        self._indentation_depth[:] = torch.where(
-            dist_obj_sensor_case <= self.cfg.gelpad_height, (self.cfg.gelpad_height - dist_obj_sensor_case) * 1000, 0
-        )
-
+        self._indentation_depth[:] = -height_map.amin((1, 2))
         return self._indentation_depth
 
     def reset(self):
@@ -145,9 +134,9 @@ class TaximSimulator(GelSightSimulator):
 
         If only optical simulation is used, then only an optical img is displayed.
         If only the marker simulatios is used, then only an image displaying the marker positions is displayed.
-        If both, optical and marker simulation, are used, then the images are overlaid.
+        If both, optical and marker simulation, are used, then two windows will be shown.
         """
-        # note: parent only deals with callbacks. not their visibility
+        # NOTE: parent only deals with callbacks. not their visibility
         if debug_vis:
             if not hasattr(self, "_debug_windows"):
                 # dict of windows that show the simulated tactile images, if the attribute of the sensor asset is turned on
@@ -182,11 +171,11 @@ class TaximSimulator(GelSightSimulator):
                             omni.ui.ByteImageProvider()
                         )  # default format omni.ui.TextureFormat.RGBA8_UNORM
 
-                    frame = self.sensor.data.output["tactile_rgb"][i].cpu().numpy() * 255
-                    frame = cv2.normalize(frame, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                    frame = self.sensor.data.output["tactile_rgb"][i].cpu().numpy()  # * 255
+                    # frame = cv2.normalize(frame, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                    # frame = frame.astype(np.uint8)
 
-                    # update image of the window
-                    frame = frame.astype(np.uint8)
+                    # update image of the debug window
                     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2RGBA)  # cv.COLOR_BGR2RGBA) COLOR_RGB2RGBA
                     height, width, channels = frame.shape
 

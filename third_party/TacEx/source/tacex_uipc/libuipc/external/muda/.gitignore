@@ -10,3 +10,6 @@ vsxmake2022
 
 # CMake Cache
 CMakeBuild/
+
+# IntelliJ IDEA
+.idea/

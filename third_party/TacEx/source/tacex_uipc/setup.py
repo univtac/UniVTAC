@@ -74,8 +74,14 @@ class CMakeBuild(build_ext):
             "-DCMAKE_EXPORT_COMPILE_COMMANDS=1",
             "-DCMAKE_COLOR_DIAGNOSTICS=1",
             "-DUIPC_BUILD_PYBIND=" + self.DUIPC_BUILD_PYBIND,  # per default = 1, i.e. true
-            "-DUIPC_DEV_MODE=1",
+            "-DUIPC_DEV_MODE=0",
             "-DUIPC_BUILD_GUI=0",
+            "-DUIPC_BUILD_EXAMPLES=0",
+            "-DUIPC_BUILD_TESTS=0",
+            "-DUIPC_BUILD_BENCHMARKS=0",
+            "-DMUDA_BUILD_EXAMPLE=0",
+            "-DMUDA_BUILD_TEST=0",
+            "-DUIPC_PYTHON_EXECUTABLE_PATH=" + sys.executable,
         ]
         if self.DCMAKE_CUDA_ARCHITECTURES is not None:  # None means "use native cuda architecture"
             cmake_args += ["-DCMAKE_CUDA_ARCHITECTURES=" + self.DCMAKE_CUDA_ARCHITECTURES]
@@ -90,7 +96,8 @@ class CMakeBuild(build_ext):
             build_args += ["--", "/m"]
         else:
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
-            build_args += ["-j4"]  # use -j8 for faster building
+            parallel_jobs = os.environ.get("CMAKE_BUILD_PARALLEL_LEVEL", "8")
+            build_args += [f"-j{parallel_jobs}"]
 
         env = os.environ.copy()
         env["CXXFLAGS"] = '{} -DVERSION_INFO=\\"{}\\"'.format(env.get("CXXFLAGS", ""), self.distribution.get_version())
@@ -118,7 +125,7 @@ setup(
     classifiers=[
         "Natural Language :: English",
         "Programming Language :: Python :: 3.10",
-        "Isaac Sim :: 4.5.0",
+        "Isaac Sim :: 5.1.0",
     ],
     ext_modules=[CMakeExtension("uipc", "libuipc")],
     cmdclass=dict(build_ext=CMakeBuild),

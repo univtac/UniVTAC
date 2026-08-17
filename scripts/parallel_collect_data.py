@@ -69,6 +69,7 @@ def worker_run(task_config, task_file_name, base_save_dir: Path, seed_q: Queue,
         task_module = importlib.import_module(f"envs.{task_file_name}")
 
         env_cfg: 'BaseTaskCfg' = task_module.TaskCfg()
+        env_cfg.tactile_optical_backend = task_config.get("optical_backend", "taxim")
         worker_id = current_process().name.split('-')[-1]
         env_cfg.save_dir = base_save_dir
         env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)

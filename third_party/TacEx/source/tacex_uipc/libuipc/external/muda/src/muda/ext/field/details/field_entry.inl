@@ -2,20 +2,15 @@
 
 namespace muda
 {
-//using T                  = float;
-//constexpr auto Layout    = FieldEntryLayout::RuntimeLayout;
-//constexpr auto SrcLayout = FieldEntryLayout::RuntimeLayout;
-//constexpr auto M         = 3;
-//constexpr auto N         = 3;
 template <typename T, FieldEntryLayout Layout, int M, int N>
-void FieldEntry<T, Layout, M, N>::copy_to(DeviceBuffer<ElementType>& dst) const
+void FieldEntry<T, Layout, M, N>::copy_to(DeviceBuffer<ValueT>& dst) const
 {
     dst.resize(count());
     view().copy_to(dst);
 }
 
 template <typename T, FieldEntryLayout Layout, int M, int N>
-void FieldEntry<T, Layout, M, N>::copy_to(std::vector<ElementType>& dst) const
+void FieldEntry<T, Layout, M, N>::copy_to(std::vector<ValueT>& dst) const
 {
     dst.resize(count());
     m_workpace.resize(count());
@@ -24,7 +19,7 @@ void FieldEntry<T, Layout, M, N>::copy_to(std::vector<ElementType>& dst) const
 }
 
 template <typename T, FieldEntryLayout Layout, int M, int N>
-void FieldEntry<T, Layout, M, N>::copy_from(const DeviceBuffer<ElementType>& src)
+void FieldEntry<T, Layout, M, N>::copy_from(const DeviceBuffer<ValueT>& src)
 {
     MUDA_ASSERT(src.size() == count(),
                 "FieldEntry: size mismatch, src.size()=%d, this count()=%d, field entry can't resize itself when copying!",
@@ -34,7 +29,7 @@ void FieldEntry<T, Layout, M, N>::copy_from(const DeviceBuffer<ElementType>& src
 }
 
 template <typename T, FieldEntryLayout Layout, int M, int N>
-void FieldEntry<T, Layout, M, N>::copy_from(const std::vector<ElementType>& src)
+void FieldEntry<T, Layout, M, N>::copy_from(const std::vector<ValueT>& src)
 {
     MUDA_ASSERT(src.size() == count(),
                 "FieldEntry: size mismatch, src.size()=%d, this count()=%d, field entry can't resize itself when copying!",
@@ -46,7 +41,7 @@ void FieldEntry<T, Layout, M, N>::copy_from(const std::vector<ElementType>& src)
 }
 
 template <typename T, FieldEntryLayout Layout, int M, int N>
-void FieldEntry<T, Layout, M, N>::fill(const ElementType& value)
+void FieldEntry<T, Layout, M, N>::fill(const ValueT& value)
 {
     view().fill(value);
 }

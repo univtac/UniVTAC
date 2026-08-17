@@ -140,6 +140,7 @@ def main():
     import os
     prism_name = os.environ.get('PRISM_NAME', 'Default')
     env_cfg.tactile_sensor_type = task_config.get('sensor_type', 'gsmini')
+    env_cfg.tactile_optical_backend = task_config.get('optical_backend', 'taxim')
     env_cfg.save_dir = Path(task_config.get("save_dir", "./data")) / task_config_file.stem / prism_name
     env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)
     env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)

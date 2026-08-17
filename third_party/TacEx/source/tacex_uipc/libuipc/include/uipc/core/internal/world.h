@@ -1,4 +1,5 @@
 #pragma once
+#include <uipc/core/sanity_checker.h>
 #include <uipc/core/internal/scene.h>
 #include <uipc/core/internal/engine.h>
 #include <uipc/core/feature_collection.h>
@@ -17,20 +18,24 @@ class UIPC_CORE_API World final : public std::enable_shared_from_this<World>
     void advance();
     void sync();
     void retrieve();
-    void backward();
     bool dump();
     bool recover(SizeT aim_frame = ~0ull);
-    bool write_vertex_pos_to_sim(span<const Vector3> positions, IndexT global_vertex_offset, IndexT local_vertex_offset, SizeT vertex_count, string system_name);
     bool is_valid() const;
 
     SizeT frame() const;
 
     const FeatureCollection& features() const;
 
+    SanityChecker&       sanity_checker();
+    const SanityChecker& sanity_checker() const;
+
+
   private:
-    internal::Scene*  m_scene  = nullptr;
-    internal::Engine* m_engine = nullptr;
-    bool              m_valid  = true;
-    void              sanity_check(Scene& s);
+    S<internal::Scene> m_scene = nullptr;
+    // MUST NOT be a shared_ptr to avoid circular reference
+    W<internal::Engine> m_engine;
+    S<SanityChecker>    m_sanity_checker;
+    bool                m_valid = true;
+    void                _sanity_check();
 };
 }  // namespace uipc::core::internal

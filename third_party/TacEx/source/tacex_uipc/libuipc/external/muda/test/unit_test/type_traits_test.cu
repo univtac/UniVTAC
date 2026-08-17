@@ -20,7 +20,7 @@ bool is_invocable_result()
 
 void type_traits_test()
 {
-    auto c1 = [] __device__() {};
+    [[maybe_unused]] auto c1 = [] __device__() {};
     // warning: std::is_invocable_v can't detect lambda in host
     // the `std::is_invocable_v` is always `true`
 
@@ -31,8 +31,8 @@ void type_traits_test()
     REQUIRE(is_invocable_result<decltype(c1)>() == true);
     REQUIRE(is_invocable_result<decltype(c1), int>() == false);
 
-    auto c2 = [] __device__(const ParallelForDetails& f) {};
-    auto c3 = [] __device__(int f) {};
+    [[maybe_unused]] auto c2 = [] __device__(const ParallelForDetails& f) {};
+    [[maybe_unused]] auto c3 = [] __device__(int f) {};
 
     REQUIRE(is_invocable_result<decltype(c2), int>() == false);
     REQUIRE(is_invocable_result<decltype(c2), ParallelForDetails>() == true);

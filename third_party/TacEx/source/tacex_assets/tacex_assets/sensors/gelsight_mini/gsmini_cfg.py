@@ -24,7 +24,7 @@ class GelSightMiniCfg(GelSightSensorCfg):
     )
 
     sensor_camera_cfg: GelSightSensorCfg.SensorCameraCfg = GelSightSensorCfg.SensorCameraCfg(
-        prim_path_appendix="/Camera",
+        prim_name="Camera",
         update_period=0,
         resolution=(320, 240),
         data_types=["depth"],

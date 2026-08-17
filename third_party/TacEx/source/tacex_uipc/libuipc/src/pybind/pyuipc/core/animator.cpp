@@ -49,13 +49,15 @@ PyAnimator::PyAnimator(py::module& m)
                            self.insert(obj,
                                        [callable](Animation::UpdateInfo& info)
                                        {
+                                           py::gil_scoped_acquire acquire;
                                            try
                                            {
+                                               // acquire gil
                                                callable(py::cast(info));
                                            }
                                            catch(const std::exception& e)
                                            {
-                                               spdlog::error("Python Animation Script Error in Object [{}]({}):\n{}",
+                                               logger::error("Python Animation Script Error in Object [{}]({}):\n{}",
                                                              info.object().name(),
                                                              info.object().id(),
                                                              e.what());

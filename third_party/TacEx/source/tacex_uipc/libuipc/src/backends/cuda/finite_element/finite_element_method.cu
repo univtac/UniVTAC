@@ -27,10 +27,8 @@
 #include <finite_element/finite_element_diff_parm_reporter.h>
 #include <finite_element/finite_element_constitution_diff_parm_reporter.h>
 #include <finite_element/finite_element_extra_constitution_diff_parm_reporter.h>
-
-//TODO remove
-#include <iostream>
-#include <vector>
+// features
+#include <finite_element/finite_element_state_accessor_feature.h>
 
 namespace uipc::backend
 {
@@ -66,8 +64,8 @@ void FiniteElementMethod::do_build()
 {
     const auto& scene = world().scene();
 
-    m_impl.default_gravity = scene.info()["gravity"].get<Vector3>();
-
+    m_impl.default_gravity = scene.config().find<Vector3>("gravity")->view()[0];
+    m_impl.default_d_hat = scene.config().find<Float>("contact/d_hat")->view()[0];
     m_impl.global_vertex_manager = &require<GlobalVertexManager>();
 
     // Register the action to write the scene
@@ -125,7 +123,6 @@ void FiniteElementMethod::init()
     m_impl.init(world());
 }
 
-
 bool FiniteElementMethod::do_dump(DumpInfo& info)
 {
     return m_impl.dump(info);
@@ -144,11 +141,6 @@ void FiniteElementMethod::do_apply_recover(RecoverInfo& info)
 void FiniteElementMethod::do_clear_recover(RecoverInfo& info)
 {
     m_impl.clear_recover(info);
-}
-
-bool FiniteElementMethod::do_write_vertex_pos_to_sim(span<const Vector3> positions, IndexT vertex_offset, SizeT vertex_count)
-{
-    return m_impl.write_vertex_pos_to_sim(positions, vertex_offset, vertex_count);
 }
 
 void FiniteElementMethod::Impl::init(WorldVisitor& world)
@@ -191,8 +183,8 @@ void FiniteElementMethod::Impl::_classify_base_constitutions()
                   auto   uidb = b->uid();
                   auto   dima = a->dim();
                   auto   dimb = b->dim();
-                  DimUID uid_dim_a{dima, uida};
-                  DimUID uid_dim_b{dimb, uidb};
+                  DimUID uid_dim_a{dima, static_cast<IndexT>(uida)};
+                  DimUID uid_dim_b{dimb, static_cast<IndexT>(uidb)};
                   return uid_dim_a < uid_dim_b;
               });
 
@@ -357,12 +349,14 @@ void FiniteElementMethod::Impl::_build_geo_infos(WorldVisitor& world)
         std::transform(geo_infos.begin(),
                        geo_infos.end(),
                        vertex_counts.begin(),
-                       [](const GeoInfo& info) { return info.vertex_count; });
+                       [](const GeoInfo& info)
+                       { return static_cast<IndexT>(info.vertex_count); });
 
         std::transform(geo_infos.begin(),
                        geo_infos.end(),
                        primitive_counts.begin(),
-                       [](const GeoInfo& info) { return info.primitive_count; });
+                       [](const GeoInfo& info)
+                       { return static_cast<IndexT>(info.primitive_count); });
 
         vertex_offsets_counts.scan();
 
@@ -503,15 +497,22 @@ void FiniteElementMethod::Impl::_build_base_constitution_infos()
                            unordered_map<U64, SizeT> uid_to_index)
     {
         infos.resize(constitutions.size());
-        vector<SizeT> vertex_counts(infos.size(), 0);
-        vector<SizeT> primitive_counts(infos.size(), 0);
-        vector<SizeT> geometry_counts(infos.size(), 0);
+
+        OffsetCountCollection<SizeT> vertex_offsets_counts;
+        vertex_offsets_counts.resize(infos.size());
+        OffsetCountCollection<SizeT> primitive_offsets_counts;
+        primitive_offsets_counts.resize(infos.size());
+        OffsetCountCollection<SizeT> geometry_offsets_counts;
+        geometry_offsets_counts.resize(infos.size());
+
+        auto vertex_counts    = vertex_offsets_counts.counts();
+        auto primitive_counts = primitive_offsets_counts.counts();
+        auto geometry_counts  = geometry_offsets_counts.counts();
 
         const auto& dim_info = dim_infos[dim];
 
         auto geo_info_subspan =
             span{geo_infos}.subspan(dim_info.geo_info_offset, dim_info.geo_info_count);
-
 
         for(auto&& geo_info : geo_info_subspan)
         {
@@ -521,33 +522,16 @@ void FiniteElementMethod::Impl::_build_base_constitution_infos()
             primitive_counts[index] += geo_info.primitive_count;
         }
 
-        vector<SizeT> vertex_offsets(infos.size(), 0);
-        vector<SizeT> primitive_offsets(infos.size(), 0);
-        vector<SizeT> geometry_offsets(infos.size(), 0);
-
         SizeT dim_geo_offset    = dim_info.geo_info_offset;
-        SizeT dim_vertex_offset = 0;
+        SizeT dim_vertex_offset = dim_info.vertex_offset;
 
-        if(geo_infos.size() > dim_geo_offset)
-        {
-            const auto& begin_geo         = geo_infos[dim_geo_offset];
-            SizeT       dim_vertex_offset = begin_geo.vertex_offset;
-        }
+        vertex_offsets_counts.scan(dim_vertex_offset);
+        primitive_offsets_counts.scan(0);
+        geometry_offsets_counts.scan(dim_geo_offset);
 
-        std::exclusive_scan(vertex_counts.begin(),
-                            vertex_counts.end(),
-                            vertex_offsets.begin(),
-                            dim_vertex_offset);
-
-        std::exclusive_scan(primitive_counts.begin(),
-                            primitive_counts.end(),
-                            primitive_offsets.begin(),
-                            0);
-
-        std::exclusive_scan(geometry_counts.begin(),
-                            geometry_counts.end(),
-                            geometry_offsets.begin(),
-                            dim_geo_offset);
+        auto vertex_offsets    = vertex_offsets_counts.offsets();
+        auto primitive_offsets = primitive_offsets_counts.offsets();
+        auto geometry_offsets  = geometry_offsets_counts.offsets();
 
         for(auto&& [i, info] : enumerate(infos))
         {
@@ -582,6 +566,8 @@ void FiniteElementMethod::Impl::_build_on_host(WorldVisitor& world)
         h_dimensions.resize(h_positions.size(), 3);   // fill 3(D) for default
         h_masses.resize(h_positions.size());
         h_vertex_contact_element_ids.resize(h_positions.size(), 0);  // fill 0 for default
+        h_vertex_subscene_contact_element_ids.resize(h_positions.size(), 0);  // fill 0 for default
+        h_vertex_d_hat.resize(h_positions.size(), default_d_hat);  // fill default d_hat
         h_vertex_is_fixed.resize(h_positions.size(), 0);  // fill 0 for default, default non-fixed
         h_vertex_is_dynamic.resize(h_positions.size(), 1);  // fill 1 for default, default dynamic
         h_vertex_body_id.resize(h_positions.size(), -1);  // fill -1 for default, invalid body id
@@ -683,13 +669,14 @@ void FiniteElementMethod::Impl::_build_on_host(WorldVisitor& world)
                     auto      posview = view(sc->positions());
                     std::ranges::transform(posview,
                                            posview.begin(),
-                                           [&](const Vector3& p)
+                                           [&](const Vector3& p) -> Vector3
                                            { return t * p; });
 
                     transview[0].setIdentity();
 
-                    spdlog::warn(R"(FEM Geometry ID={} has non-identity transform. The transform is applied to the positions and reset to identity.
-To avoid this warning, please apply the transform to the positions mannally. https://github.com/spiriMirror/libuipc/issues/152)");
+                    logger::warn(R"(FEM Geometry ID={} has non-identity transform. The transform is applied to the positions and reset to identity.
+To avoid this warning, please apply the transform to the positions mannally. https://github.com/spiriMirror/libuipc/issues/152)",
+                                 geo_slot->id());
                 }
 
                 auto pos_view = sc->positions().view();
@@ -757,12 +744,17 @@ To avoid this warning, please apply the transform to the positions mannally. htt
                 }
             }
 
-            {  // 6) setup vertex contact element id
+            {  // 6) setup vertex contact element id and d_hat
 
                 auto dst_eid_span = span{h_vertex_contact_element_ids}.subspan(
                     info.vertex_offset, info.vertex_count);
 
+                auto dst_subscene_eid_span =
+                    span{h_vertex_subscene_contact_element_ids}.subspan(
+                        info.vertex_offset, info.vertex_count);
+
                 auto vert_ceid = sc->vertices().find<IndexT>(builtin::contact_element_id);
+
                 if(vert_ceid)
                 {
                     auto ceid_view = vert_ceid->view();
@@ -780,6 +772,47 @@ To avoid this warning, please apply the transform to the positions mannally. htt
                         auto eid = ceid->view()[0];
                         std::ranges::fill(dst_eid_span, eid);
                     }
+                }
+
+                auto vert_subscene_ceid =
+                    sc->vertices().find<IndexT>(builtin::subscene_element_id);
+                if(vert_subscene_ceid)
+                {
+                    auto subscene_ceid_view = vert_subscene_ceid->view();
+                    UIPC_ASSERT(subscene_ceid_view.size()
+                                    == dst_subscene_eid_span.size(),
+                                "subscene contact element id size mismatching");
+
+                    std::ranges::copy(subscene_ceid_view, dst_subscene_eid_span.begin());
+                }
+                else
+                {
+                    auto subscene_ceid =
+                        sc->meta().find<IndexT>(builtin::subscene_element_id);
+
+                    if(subscene_ceid)
+                    {
+                        auto eid = subscene_ceid->view()[0];
+                        std::ranges::fill(dst_subscene_eid_span, eid);
+                    }
+                    else
+                    {
+                        std::ranges::fill(dst_subscene_eid_span, 0);
+                    }
+                }
+
+                auto dst_d_hat_span =
+                    span{h_vertex_d_hat}.subspan(info.vertex_offset, info.vertex_count);
+
+                auto meta_d_hat = sc->meta().find<Float>(builtin::d_hat);
+                if(meta_d_hat)
+                {
+                    auto d_hat_view = meta_d_hat->view();
+                    std::ranges::fill(dst_d_hat_span, d_hat_view.front());
+                }
+                else
+                {
+                    std::ranges::fill(dst_d_hat_span, default_d_hat);
                 }
             }
 
@@ -1019,7 +1052,7 @@ void FiniteElementMethod::Impl::_init_energy_producers()
 {
     auto constitution_view       = constitutions.view();
     auto extra_constitution_view = extra_constitutions.view();
-    SizeT N = constitution_view.size() + constitution_view.size() + 1 /*Kinetic*/;
+    SizeT N = constitution_view.size() + extra_constitution_view.size() + 1 /*Kinetic*/;
     energy_producers.reserve(N);
     energy_producers.push_back(kinetic.view());
     std::ranges::copy(constitution_view, std::back_inserter(energy_producers));
@@ -1100,7 +1133,6 @@ void FiniteElementMethod::Impl::write_scene(WorldVisitor& world)
         // TODO:
         // Now there is no topology modification, so no need to write back
         // In the future, we may need to write back the topology if the topology is modified
-    
     }
 }
 }  // namespace uipc::backend::cuda
@@ -1156,28 +1188,6 @@ void FiniteElementMethod::Impl::clear_recover(RecoverInfo& info)
     dump_xs.clean_up();
     dump_vs.clean_up();
     dump_x_prevs.clean_up();
-}
-
-bool FiniteElementMethod::Impl::write_vertex_pos_to_sim(span<const Vector3> positions, IndexT vertex_offset, SizeT vertex_count)
-{
-    // const auto& scene = this->world().scene();
-    // auto geo_slots = scene.geometries();
-
-    std::cout << "write_vertex_pos_to_sim FEM: " <<"\n";
-    
-    std::cout << "vertex_offset " << vertex_offset << "\n";
-    std::cout << "vertex_count " << vertex_count << "\n";
-
-        
-    // buffer.resize(byte_buffer.size() / sizeof(T));
-    xs.view(vertex_offset, vertex_count).copy_from(positions.data());
-    x_prevs.view(vertex_offset, vertex_count).copy_from(positions.data());
-    
-    vector<Vector3> vel;
-    vel.resize(vertex_count, Vector3::Zero());
-    vs.view(vertex_offset, vertex_count).copy_from(span{vel}.data());
-    
-    return true;
 }
 
 void FiniteElementMethod::Impl::set_dof_info(SizeT frame, IndexT dof_offset, IndexT dof_count)

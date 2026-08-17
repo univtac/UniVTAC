@@ -3,6 +3,7 @@
 #include <uipc/common/string.h>
 #include <uipc/common/json.h>
 #include <uipc/geometry/geometry.h>
+
 namespace uipc::core
 {
 class UIPC_CORE_API ContactElement

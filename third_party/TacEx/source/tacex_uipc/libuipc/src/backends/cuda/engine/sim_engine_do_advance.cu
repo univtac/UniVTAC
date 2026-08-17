@@ -2,6 +2,7 @@
 #include <uipc/common/range.h>
 #include <global_geometry/global_vertex_manager.h>
 #include <global_geometry/global_simplicial_surface_manager.h>
+#include <dytopo_effect_system/global_dytopo_effect_manager.h>
 #include <contact_system/global_contact_manager.h>
 #include <collision_detection/global_trajectory_filter.h>
 #include <line_search/line_searcher.h>
@@ -18,9 +19,6 @@ void SimEngine::do_advance()
     Float alpha     = 1.0;
     Float ccd_alpha = 1.0;
     Float cfl_alpha = 1.0;
-
-    bool dump_surface =
-        world().scene().info()["extras"]["debug"]["dump_surface"].get<bool>();
 
     /***************************************************************************************
     *                                  Function Shortcuts
@@ -69,12 +67,15 @@ void SimEngine::do_advance()
             m_global_contact_manager->compute_adaptive_kappa();
     };
 
-    auto compute_contact = [this]
+    auto compute_dytopo_effect = [this]
     {
-        if(m_global_contact_manager)
+        // compute the dytopo effect gradient and hessian, containing:
+        // 1) contact effect from contact pairs
+        // 2) other dynamic topo effects, e.g. point picker, vertex stitch ...
+        if(m_global_dytopo_effect_manager)
         {
-            Timer timer{"Compute Contact"};
-            m_global_contact_manager->compute_contact();
+            Timer timer{"Compute DyTopo Effect"};
+            m_global_dytopo_effect_manager->compute_dytopo_effect();
         }
     };
 
@@ -85,7 +86,7 @@ void SimEngine::do_advance()
             cfl_alpha = m_global_contact_manager->compute_cfl_condition();
             if(cfl_alpha < alpha)
             {
-                spdlog::info("CFL Filter: {} < {}", cfl_alpha, alpha);
+                logger::info("CFL Filter: {} < {}", cfl_alpha, alpha);
                 return cfl_alpha;
             }
         }
@@ -101,7 +102,7 @@ void SimEngine::do_advance()
             ccd_alpha = m_global_trajectory_filter->filter_toi(alpha);
             if(ccd_alpha < alpha)
             {
-                spdlog::info("CCD Filter: {} < {}", ccd_alpha, alpha);
+                logger::info("CCD Filter: {} < {}", ccd_alpha, alpha);
                 return ccd_alpha;
             }
         }
@@ -138,7 +139,7 @@ void SimEngine::do_advance()
         if(m_global_animator)
         {
             m_global_animator->compute_substep_ratio(newton_iter);
-            spdlog::info("Animation Substep Ratio: {}", m_global_animator->substep_ratio());
+            logger::info("Animation Substep Ratio: {}", m_global_animator->substep_ratio());
         }
     };
 
@@ -151,12 +152,74 @@ void SimEngine::do_advance()
         return true;
     };
 
+    auto convergence_check = [&](SizeT newton_iter) -> bool
+    {
+        if(m_dump_surface->view()[0])
+        {
+            dump_global_surface(fmt::format("dump_surface.{}.{}", m_current_frame, newton_iter));
+        }
+
+        NewtonToleranceManager::ResultInfo result_info;
+        result_info.frame(m_current_frame);
+        result_info.newton_iter(newton_iter);
+        m_newton_tolerance_manager->check(result_info);
+
+        if(!result_info.converged())
+            return false;
+
+        // ccd alpha should close to 1.0
+        if(ccd_alpha < m_ccd_tol->view()[0])
+            return false;
+
+        if(!animation_reach_target())
+            return false;
+
+        return true;
+    };
+
     auto update_diff_parm = [this]()
     {
         if(m_global_diff_sim_manager)
         {
             Timer timer{"Update Diff Parm"};
             m_global_diff_sim_manager->update();
+        }
+    };
+
+    auto check_line_search_iter = [this](SizeT iter)
+    {
+        if(iter >= m_line_searcher->max_iter())
+        {
+            logger::warn("Line Search Exits with Max Iteration: {} (Frame={})",
+                         m_line_searcher->max_iter(),
+                         m_current_frame);
+
+            if(m_strict_mode->view()[0])
+            {
+                throw SimEngineException("StrictMode: Line Search Exits with Max Iteration");
+            }
+        }
+    };
+
+    auto check_newton_iter = [this](SizeT iter)
+    {
+        if(iter >= m_newton_max_iter->view()[0])
+        {
+            logger::warn("Newton Iteration Exits with Max Iteration: {} (Frame={})",
+                         m_newton_max_iter->view()[0],
+                         m_current_frame);
+
+            if(m_strict_mode->view()[0])
+            {
+                throw SimEngineException("StrictMode: Newton Iteration Exits with Max Iteration");
+            }
+        }
+        else
+        {
+            logger::info("Newton Iteration Converged with Iteration Count: {}, Bound: [{}, {}]",
+                         iter,
+                         m_newton_min_iter->view()[0],
+                         m_newton_max_iter->view()[0]);
         }
     };
 
@@ -173,7 +236,7 @@ void SimEngine::do_advance()
 
         ++m_current_frame;
 
-        spdlog::info(R"(>>> Begin Frame: {})", m_current_frame);
+        logger::info(R"(>>> Begin Frame: {})", m_current_frame);
 
         // Rebuild Scene
         {
@@ -198,14 +261,14 @@ void SimEngine::do_advance()
         // Simulation:
         {
             Timer timer{"Simulation"};
-            // 1. Adaptive Parameter Calculation
-            AABB vertex_bounding_box =
-                m_global_vertex_manager->compute_vertex_bounding_box();
+            // 1. Record Friction Candidates at the beginning of the frame
+            record_friction_candidates();
+            m_global_vertex_manager->update_attributes();
+            m_global_vertex_manager->record_prev_positions();
+
+            // 2. Adaptive Parameter Calculation
             detect_dcd_candidates();
             compute_adaptive_kappa();
-
-            // 2. Record Friction Candidates at the beginning of the frame
-            record_friction_candidates();
 
             // 3. Predict Motion => x_tilde = x + v * dt
             m_state = SimEngineState::PredictMotion;
@@ -213,26 +276,30 @@ void SimEngine::do_advance()
             step_animation();
 
             // 4. Nonlinear-Newton Iteration
-            Float box_size = vertex_bounding_box.diagonal().norm();
-            Float tol      = m_newton_scene_tol * box_size;
-            Float res0     = 0.0;
             m_newton_tolerance_manager->pre_newton(m_current_frame);
 
-            SizeT newton_iter = 0;
-            for(; newton_iter < m_newton_max_iter; ++newton_iter)
+            auto   newton_max_iter = m_newton_max_iter->view()[0];
+            auto   newton_min_iter = m_newton_min_iter->view()[0];
+            IndexT newton_iter     = 0;
+            for(; newton_iter < newton_max_iter; ++newton_iter)
             {
                 Timer timer{"Newton Iteration"};
 
                 // 1) Compute animation substep ratio
                 compute_animation_substep_ratio(newton_iter);
 
+
                 // 2) Build Collision Pairs
                 if(newton_iter > 0)
                     detect_dcd_candidates();
 
-                // 3) Compute Contact Gradient and Hessian => G:Vector3, H:Matrix3x3
-                m_state = SimEngineState::ComputeContact;
-                compute_contact();
+
+                // 3) Compute Dynamic Topo Effect Gradient and Hessian => G:Vector3, H:Matrix3x3
+                //    - Contact Effect
+                //    - Other DyTopo Effects
+                m_state = SimEngineState::ComputeDyTopoEffect;
+                compute_dytopo_effect();
+
 
                 // 4) Solve Global Linear System => dx = A^-1 * b
                 m_state = SimEngineState::SolveGlobalLinearSystem;
@@ -247,32 +314,13 @@ void SimEngine::do_advance()
 
 
                 // 6) Check Termination Condition
-                bool converged = false;
-                {
-                    NewtonToleranceManager::ResultInfo result_info;
-                    result_info.frame(m_current_frame);
-                    result_info.newton_iter(newton_iter);
-                    m_newton_tolerance_manager->check(result_info);
-
-                    converged = result_info.converged();
-
-                    if(dump_surface)
-                    {
-                        dump_global_surface(fmt::format(
-                            "dump_surface.{}.{}", m_current_frame, newton_iter));
-                    }
-
-                    if(newton_iter > 0  // always skip the first iteration
-                       && converged     // check convergence
-                       && ccd_alpha >= m_ccd_tol     // check ccd tolerance
-                       && animation_reach_target())  // check animation target
-                    {
-                        break;
-                    }
-                }
+                bool converged  = convergence_check(newton_iter);
+                bool terminated = converged && (newton_iter >= newton_min_iter);
+                if(terminated)
+                    break;
 
 
-                // 8) Begin Line Search
+                // 7) Begin Line Search
                 m_state = SimEngineState::LineSearch;
                 {
                     Timer timer{"Line Search"};
@@ -287,7 +335,6 @@ void SimEngine::do_advance()
 
                     // Compute Current Energy => E_0
                     Float E0 = m_line_searcher->compute_energy(true);  // initial energy
-                    // spdlog::info("Initial Energy: {}", E0);
 
                     // CCD filter
                     alpha = filter_toi(alpha);
@@ -297,8 +344,7 @@ void SimEngine::do_advance()
 
                     // * Step Forward => x = x_0 + alpha * dx
                     // Compute Test Energy => E
-                    Float E  = compute_energy(alpha);
-                    Float E1 = E;
+                    Float E = compute_energy(alpha);
 
                     if(!converged)
                     {
@@ -307,12 +353,16 @@ void SimEngine::do_advance()
                         {
                             Timer timer{"Line Search Iteration"};
 
-                            bool energy_decrease = E <= E0;  // Check Energy Decrease
+                            // Check Energy Decrease
+                            // TODO: maybe better condition like Wolfe condition/Armijo condition in the future
+                            bool energy_decrease = (E <= E0);
 
-                            // TODO: Inversion Check (Not Implemented Yet)
+                            // Check Inversion
+                            // TODO: Inversion check if needed
                             bool no_inversion = true;
 
                             bool success = energy_decrease && no_inversion;
+
                             if(success)
                                 break;
 
@@ -323,26 +373,9 @@ void SimEngine::do_advance()
                             line_search_iter++;
                         }
 
-                        if(line_search_iter > m_line_searcher->max_iter())
-                        {
-                            //m_global_linear_system->dump_linear_system(
-                            //    fmt::format("{}.{}.{}", workspace(), frame(), newton_iter));
-
-                            spdlog::warn(
-                                "Line Search Exits with Max Iteration: {} (Frame={}, Newton={})\n"
-                                "E/E0: {}, E1/E0: {}, E0:{}",
-                                m_line_searcher->max_iter(),
-                                m_current_frame,
-                                newton_iter,
-                                E / E0,
-                                E1 / E0,
-                                E0);
-
-                            if(m_strict_mode)
-                            {
-                                throw SimEngineException("StrictMode: Line Search Exits with Max Iteration");
-                            }
-                        }
+                        // Check Line Search Iteration
+                        // report warnings or throw exceptions if needed
+                        check_line_search_iter(line_search_iter);
                     }
                 }
             }
@@ -352,36 +385,23 @@ void SimEngine::do_advance()
             {
                 Timer timer{"Update Velocity"};
                 m_time_integrator_manager->update_state();
-                m_global_vertex_manager->record_prev_positions();
             }
 
-            if(newton_iter > m_newton_max_iter)
-            {
-                spdlog::warn("Newton Iteration Exits with Max Iteration: {} (Frame={})",
-                             m_newton_max_iter,
-                             m_current_frame);
-
-                if(m_strict_mode)
-                {
-                    throw SimEngineException("StrictMode: Newton Iteration Exits with Max Iteration");
-                }
-            }
+            // Check Newton Iteration
+            // report warnings or throw exceptions if needed
+            check_newton_iter(newton_iter);
         }
 
-        // NOTE: Don't change any state after this point
-        // 1) SimEngine::do_backward() may be called later, please keep the state consistent
-
-        spdlog::info("<<< End Frame: {}", m_current_frame);
+        logger::info("<<< End Frame: {}", m_current_frame);
     };
 
     try
     {
         pipeline();
-        m_last_solved_frame = m_current_frame;
     }
     catch(const SimEngineException& e)
     {
-        spdlog::error("Engine Advance Error: {}", e.what());
+        logger::error("Engine Advance Error: {}", e.what());
         status().push_back(core::EngineStatus::error(e.what()));
     }
 }

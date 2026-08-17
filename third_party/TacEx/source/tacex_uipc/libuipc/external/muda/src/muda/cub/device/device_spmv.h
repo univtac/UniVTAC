@@ -1,8 +1,10 @@
 #pragma once
 #include <muda/cub/device/cub_wrapper.h>
 #include "details/cub_wrapper_macro_def.inl"
+#if CUDA_VERSION < 13000
 #ifndef __INTELLISENSE__
 #include <cub/device/device_spmv.cuh>
+#endif
 #endif
 
 namespace muda
@@ -14,7 +16,7 @@ class DeviceSpmv : public CubWrapper<DeviceSpmv>
 
   public:
     using Base::Base;
-
+#if CUDA_VERSION < 13000
     template <typename ValueT>
     DeviceSpmv& CsrMV(const ValueT* d_values,
                       const int*    d_row_offsets,
@@ -64,6 +66,9 @@ class DeviceSpmv : public CubWrapper<DeviceSpmv>
                                                                        num_nonzeros,
                                                                        _stream));
     }
+  #else
+  // TODO: CsrMV
+  #endif
 };
 }  // namespace muda
 

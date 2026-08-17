@@ -12,6 +12,7 @@ use_seed: true
 episode_num: 5
 
 sensor_type: gsmini
+optical_backend: taxim # taxim or pix2pix; selected before Isaac Sim starts
 
 observations:
   camera: ['rgb']

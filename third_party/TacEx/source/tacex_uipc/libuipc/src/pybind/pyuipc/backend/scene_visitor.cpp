@@ -34,19 +34,23 @@ PySceneVisitor::PySceneVisitor(py::module& m)
                            [](SceneVisitor& self)
                            { return self.pending_rest_geometries(); });
 
-    class_SceneVisitor.def("info", &SceneVisitor::info);
+    class_SceneVisitor.def("config", &SceneVisitor::config);
 
-    class_SceneVisitor.def("constitution_tabular",
-                           [](SceneVisitor& self) -> ConstitutionTabular&
-                           { return self.constitution_tabular(); });
-    class_SceneVisitor.def("contact_tabular",
-                           [](SceneVisitor& self) -> ContactTabular&
-                           { return self.contact_tabular(); });
+    class_SceneVisitor.def(
+        "constitution_tabular",
+        [](SceneVisitor& self) -> ConstitutionTabular&
+        { return self.constitution_tabular(); },
+        py::return_value_policy::reference_internal);
+    class_SceneVisitor.def(
+        "contact_tabular",
+        [](SceneVisitor& self) -> ContactTabular&
+        { return self.contact_tabular(); },
+        py::return_value_policy::reference_internal);
 
     class_SceneVisitor.def("diff_sim",
                            [](SceneVisitor& self) -> DiffSimVisitor&
                            { return self.diff_sim(); });
 
-    class_SceneVisitor.def("ref", &SceneVisitor::ref, py::return_value_policy::reference_internal);
+    class_SceneVisitor.def("get", &SceneVisitor::get, py::return_value_policy::move);
 }
 }  // namespace pyuipc::backend

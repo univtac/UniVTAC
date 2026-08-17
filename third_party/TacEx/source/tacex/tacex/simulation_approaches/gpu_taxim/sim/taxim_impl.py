@@ -14,7 +14,7 @@ DeviceType = TypeVar("DeviceType")
 
 
 # All parameters ending in _rel will be multiplied by the width of the sensor image in pixels
-@dataclass(frozen=True)
+@dataclass(frozen=False)
 class SimulatorParameters:
     initial_frame_sigma_rel: float  # Initial frame sigma
     frame_mixing_percentage: float

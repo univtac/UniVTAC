@@ -24,15 +24,65 @@ class GelSightSensorCfg(SensorBaseCfg):
     case_dimensions: Dimensions = Dimensions()
     gelpad_dimensions: Dimensions = Dimensions()
 
+    max_indentation_depth: float = 0.0
+    """The maximum indentation depth in [m].
+
+    Used e.g. for normalizing height map w.r.t to possible indentation depth range.
+    """
+
     @configclass
     class SensorCameraCfg:
         """Configs for the Camera of the GelSight sensor."""
 
-        prim_path_appendix: str = "/Camera"
+        prim_name: str = "Camera"
         update_period: float = 0
         resolution: tuple[int, int] = (32, 24)
         data_types: list[str] = ["depth"]
-        clipping_range: tuple[float, float] = (0.0, 1.0)
+        clipping_range: tuple[float, float] = (0.024, 0.028)
+        update_latest_camera_pose: bool = False
+
+        camera_pos_offset: tuple[float, float, float] = (0.0000, -0.0001, 0.0)
+        """Translation of camera w.r.t to sensor frame.
+
+        Even very small changes can lead to relativly big differences in the indentation location.
+
+        Defaults to (0.0000, -0.0001, 0.0) for the GelSight Mini. This offset places the camera in the center of the gelpad frame.
+        """
+
+        camera_rot_offset: tuple[float, float, float, float] = (0.0, 1.0, 0.0, 0.0)
+        """Quaternion rotation (w, x, y, z) w.r.t. the parent frame. Defaults to (0.0, 1.0, 0.0, 0.0)."""
+
+        focal_length: float = 1.05
+        """Focal length of the sensor camera (in [cm]).
+
+        Determines the "zoom" in the image, i.e. how big objects appear.
+        Value should be set so that focus_distance and focal_length combination
+        leads to appropriate indentation area of known indenters.
+        E.g. 2mm cylinder with pixmm value 0.0634 mm/pix should lead to an tactile rgb image
+        with an sphere of radius 2/0.0634 = 32 pix).
+
+        You can use the `taxim_shape_touch.py` script to try out different values.
+
+        Note: This value is not used to compute horizontal/vertical aperture.
+        """
+
+        focus_distance: float = 0.024 + 0.004
+        """Distance from camera to focus plane (in [m]).
+
+        Determines where the FOV of the sensor camera is.
+        Should be at highest point of the gelpad (e.g. for GsMini thats 2.5cm due to sensor case height + gelpad height 4mm)"""
+
+        fov_width = 0.02525 * (1 - 0.15)  # crop out border like real GelSight Mini # orig. camera fov: 0.0186
+        """Camera field of view width (in [m])."""
+
+        fov_height = 0.02075 * (1 - 0.15)  # 0.0143
+        """Camera field of view height (in [m])."""
+
+        horizontal_aperture: float | None = None
+        """Optional explicit horizontal aperture. If unset it is derived from FoV."""
+
+        vertical_aperture: float | None = None
+        """Optional explicit vertical aperture. If unset it is derived from FoV."""
 
     sensor_camera_cfg: SensorCameraCfg = SensorCameraCfg()
 
@@ -55,10 +105,11 @@ class GelSightSensorCfg(SensorBaseCfg):
     marker_motion_sim_cfg: GelSightSimulatorCfg = None
     """Cfg class of the marker motion simulator you want to use."""
 
-    compute_indentation_depth_class: Literal["optical_sim", "marker_motion_sim"] = "optical_sim"
+    compute_indentation_depth_class: Literal["optical_sim", "marker_motion_sim", "default"] = "default"
     """Defines which approach is used for computing the indentation depth.
 
     You can use the method from your optical simulation (e.g. Taxim), or the one from your marker motion simulation (e.g. if its FEM based).
+    By default the minimum value of the height map is used as indentation depth.
     """
 
     device: str = "cuda"

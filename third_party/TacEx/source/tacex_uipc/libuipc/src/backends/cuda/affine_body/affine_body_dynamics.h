@@ -10,6 +10,7 @@
 namespace uipc::backend::cuda
 {
 class AffineBodyConstitution;
+class AffineBodyExtraConstitution;
 class AffineBodyDiffParmReporter;
 class AffineBodyDiffDofReporter;
 class AffineBodyKineticDiffParmReporter;
@@ -151,10 +152,10 @@ class AffineBodyDynamics : public SimSystem
     {
       public:
         ComputeGradientHessianInfo(muda::BufferView<Vector12>    gradient,
-                                   muda::BufferView<Matrix12x12> hessian,
+                                   muda::BufferView<Matrix12x12> hessians,
                                    Float                         dt)
             : m_gradients(gradient)
-            , m_hessians(hessian)
+            , m_hessians(hessians)
             , m_dt(dt)
         {
         }
@@ -178,8 +179,6 @@ class AffineBodyDynamics : public SimSystem
     virtual void do_apply_recover(RecoverInfo& info) override;
     virtual void do_clear_recover(RecoverInfo& info) override;
 
-    virtual bool do_write_vertex_pos_to_sim(span<const Vector3> positions, IndexT vertex_offset, SizeT vertex_count);
-
   public:
     class Impl
     {
@@ -196,6 +195,7 @@ class AffineBodyDynamics : public SimSystem
         void _download_geometry_to_host();
 
         void _init_dof_info();
+        void _init_extra_constitutions();
         void _init_diff_reporters();
 
         void write_scene(WorldVisitor& world);
@@ -204,8 +204,6 @@ class AffineBodyDynamics : public SimSystem
         bool try_recover(RecoverInfo& info);
         void apply_recover(RecoverInfo& info);
         void clear_recover(RecoverInfo& info);
-
-        bool write_vertex_pos_to_sim(span<const Vector3> positions, IndexT vertex_offset, SizeT vertex_count);
 
         template <typename ViewGetterF, typename ForEachF>
         static void _for_each(span<S<geometry::GeometrySlot>> geo_slots,
@@ -254,14 +252,18 @@ class AffineBodyDynamics : public SimSystem
         /******************************************************************************
         *                        host simulation data
         *******************************************************************************/
+        Float             default_d_hat = 0.01;
         vector<ABDJacobi> h_vertex_id_to_J;
+        vector<Float>     h_vertex_id_to_d_hat;
         vector<IndexT>    h_vertex_id_to_body_id;
         vector<IndexT>    h_vertex_id_to_contact_element_id;
+        vector<IndexT>    h_vertex_id_to_subscene_contact_element_id;
 
-        vector<Vector12>            h_body_id_to_q;
-        vector<Vector12>            h_body_id_to_q_v;
-        vector<IndexT>              h_body_id_to_dim;             // 2 or 3
-        vector<IndexT>              h_body_id_to_self_collision;  // 0 or 1
+        vector<Vector12> h_body_id_to_q;
+        vector<Vector12> h_body_id_to_q_v;
+        vector<IndexT>   h_body_id_to_dim;             // 2 or 3
+        vector<IndexT>   h_body_id_to_self_collision;  // 0 or 1
+
         vector<ABDJacobiDyadicMass> h_body_id_to_abd_mass;
         vector<Matrix12x12>         h_body_id_to_abd_mass_inv;
         vector<Float>               h_body_id_to_volume;
@@ -416,6 +418,9 @@ class AffineBodyDynamics : public SimSystem
          */
         IndexT dof_count(SizeT frame) const;
 
+        // Extra constitutions - placed at end to avoid changing memory layout of existing members
+        SimSystemSlotCollection<AffineBodyExtraConstitution> extra_constitutions;
+
       private:
         vector<IndexT> frame_to_dof_offset;
         vector<IndexT> frame_to_dof_count;
@@ -502,6 +507,9 @@ class AffineBodyDynamics : public SimSystem
     friend class AffineBodyConstitution;
     void add_constitution(AffineBodyConstitution* constitution);  // only be called by AffineBodyConstitution
 
+    friend class AffineBodyExtraConstitution;
+    void add_extra_constitution(AffineBodyExtraConstitution* constitution);  // only be called by AffineBodyExtraConstitution
+
     friend class AffineBodyKinetic;
     void add_kinetic(AffineBodyKinetic* kinetic);  // only be called by AffineBodyKinetic
 
@@ -526,6 +534,7 @@ class AffineBodyDynamics : public SimSystem
 
     friend class AffineBodyKineticDiffParmReporter;
     friend class ABDTimeIntegrator;
+    friend class AffineBodyStateAccessorFeatureOverrider;
 
     void add_reporter(AffineBodyKineticDiffParmReporter* reporter);
 

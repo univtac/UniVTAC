@@ -29,14 +29,13 @@ class ContactTabular::Impl
         m_elements.reserve(64);
 
         // create the contact models.
-        m_topo           = m_contact_models.create<Vector2i>("topo");
-        m_friction_rates = m_contact_models.create<Float>("friction_rate");
-        m_resistances    = m_contact_models.create<Float>("resistance");
-        m_is_enabled     = m_contact_models.create<IndexT>("is_enabled");
+        m_topo           = m_models.create<Vector2i>("topo");
+        m_friction_rates = m_models.create<Float>("friction_rate");
+        m_resistances    = m_models.create<Float>("resistance");
+        m_is_enabled     = m_models.create<IndexT>("is_enabled");
 
         // reserve the memory for contact models.
-        m_contact_models.reserve(m_contact_model_capacity);
-
+        m_models.reserve(m_model_capacity);
 
         auto default_element = create("default");
         insert(default_element, default_element, 0.5, 1.0_GPa, true, default_config());
@@ -47,7 +46,7 @@ class ContactTabular::Impl
         auto   id = current_element_id();
         string name_str{name};
         if(name_str.empty())
-            name_str = fmt::format("_{}", id);
+            name_str = fmt::format("#{}", id);
 
         m_elements.push_back(ContactElement(id, name_str));
 
@@ -94,16 +93,12 @@ class ContactTabular::Impl
 
         if(it != m_model_map.end())
         {
+            // replace the existing contact model
             index = it->second;
-            UIPC_WARN_WITH_LOCATION("Contact model between {}[{}] and {}[{}] already exists, replace the old one.",
-                                    m_elements[L.id()].name(),
-                                    L.id(),
-                                    m_elements[R.id()].name(),
-                                    R.id());
         }
         else
         {
-            index            = m_contact_models.size();
+            index            = m_models.size();
             m_model_map[ids] = index;
 
             _append_contact_models();
@@ -117,25 +112,36 @@ class ContactTabular::Impl
         return index;
     }
 
-    IndexT current_element_id() const noexcept { return m_elements.size(); }
+    IndexT current_element_id() const noexcept
+    {
+        return static_cast<IndexT>(m_elements.size());
+    }
 
-    IndexT index_at(SizeT i, SizeT j) const
+    IndexT index_at(IndexT i, IndexT j) const
     {
         Vector2i ids{i, j};
         if(ids.x() > ids.y())
             std::swap(ids.x(), ids.y());
 
         auto it = m_model_map.find(ids);
-        return it != m_model_map.end() ? it->second : 0;
+        return it != m_model_map.end() ? it->second : -1;
     }
 
-    ContactModel at(SizeT i, SizeT j) const
+    ContactModel at(IndexT i, IndexT j) const
     {
-        return ContactModel{Vector2i{i, j},
-                            view(*m_friction_rates)[index_at(i, j)],
-                            view(*m_resistances)[index_at(i, j)],
-                            view(*m_is_enabled)[index_at(i, j)] != 0,
-                            Json::object()};
+        auto idx = index_at(i, j);
+
+        // UIPC-SPEC:
+        // If the contact model between two contact elements is not defined,
+        // the default contact model will be used.
+        if(idx < 0)
+            idx = 0;
+
+        auto friction_rate = m_friction_rates->view()[idx];
+        auto resistance    = m_resistances->view()[idx];
+        bool enable        = m_is_enabled->view()[idx];
+
+        return ContactModel{Vector2i{i, j}, friction_rate, resistance, enable, Json::object()};
     }
 
     void default_model(Float friction_rate, Float resistance, bool enable, const Json& config) noexcept
@@ -149,23 +155,26 @@ class ContactTabular::Impl
 
     ContactElement default_element() noexcept { return m_elements.front(); }
 
+
     const geometry::AttributeCollection& contact_models() const noexcept
     {
-        return m_contact_models;
+        return m_models;
     }
 
     geometry::AttributeCollection& contact_models() noexcept
     {
-        return m_contact_models;
+        return m_models;
     }
 
+
     SizeT element_count() const noexcept { return m_elements.size(); }
+
 
     static Json default_config() noexcept { return Json::object(); }
 
     vector<ContactElement>        m_elements;
-    geometry::AttributeCollection m_contact_models;
-    SizeT                         m_contact_model_capacity = 1024;
+    geometry::AttributeCollection m_models;
+    SizeT                         m_model_capacity = 1024;
 
     mutable map<Vector2i, IndexT> m_model_map;
 
@@ -176,13 +185,13 @@ class ContactTabular::Impl
 
     void _append_contact_models()
     {
-        auto new_size = m_contact_models.size() + 1;
-        if(m_contact_model_capacity < new_size)
+        auto new_size = m_models.size() + 1;
+        if(m_model_capacity < new_size)
         {
-            m_contact_model_capacity *= 2;
-            m_contact_models.reserve(m_contact_model_capacity);
+            m_model_capacity *= 2;
+            m_models.reserve(m_model_capacity);
         }
-        m_contact_models.resize(new_size);
+        m_models.resize(new_size);
     }
 
     void build_from(const geometry::AttributeCollection& ac, span<const ContactElement> ce)
@@ -190,14 +199,14 @@ class ContactTabular::Impl
         m_elements.clear();
         m_elements = vector<ContactElement>(ce.begin(), ce.end());
 
-        m_contact_models = ac;
-        m_topo           = m_contact_models.find<Vector2i>("topo");
+        m_models = ac;
+        m_topo   = m_models.find<Vector2i>("topo");
         UIPC_ASSERT(m_topo, "Contact model topology is not found, please check the attribute collection.");
-        m_friction_rates = m_contact_models.find<Float>("friction_rate");
+        m_friction_rates = m_models.find<Float>("friction_rate");
         UIPC_ASSERT(m_friction_rates, "Contact model friction rates is not found, please check the attribute collection.");
-        m_resistances = m_contact_models.find<Float>("resistance");
+        m_resistances = m_models.find<Float>("resistance");
         UIPC_ASSERT(m_resistances, "Contact model resistances is not found, please check the attribute collection.");
-        m_is_enabled = m_contact_models.find<IndexT>("is_enabled");
+        m_is_enabled = m_models.find<IndexT>("is_enabled");
         UIPC_ASSERT(m_is_enabled, "Contact model is_enabled is not found, please check the attribute collection.");
 
         m_model_map.clear();
@@ -215,14 +224,14 @@ class ContactTabular::Impl
         m_elements.clear();
         m_elements = vector<ContactElement>(ce.begin(), ce.end());
 
-        m_contact_models.update_from(ac);
-        m_topo = m_contact_models.find<Vector2i>("topo");
+        m_models.update_from(ac);
+        m_topo = m_models.find<Vector2i>("topo");
         UIPC_ASSERT(m_topo, "Contact model topology is not found, please check the attribute collection.");
-        m_friction_rates = m_contact_models.find<Float>("friction_rate");
+        m_friction_rates = m_models.find<Float>("friction_rate");
         UIPC_ASSERT(m_friction_rates, "Contact model friction rates is not found, please check the attribute collection.");
-        m_resistances = m_contact_models.find<Float>("resistance");
+        m_resistances = m_models.find<Float>("resistance");
         UIPC_ASSERT(m_resistances, "Contact model resistances is not found, please check the attribute collection.");
-        m_is_enabled = m_contact_models.find<IndexT>("is_enabled");
+        m_is_enabled = m_models.find<IndexT>("is_enabled");
         UIPC_ASSERT(m_is_enabled, "Contact model is_enabled is not found, please check the attribute collection.");
 
         auto topo_view = m_topo->view();
@@ -256,7 +265,7 @@ IndexT ContactTabular::insert(const ContactElement& L,
     return m_impl->insert(L, R, friction_rate, resistance, enable, config);
 }
 
-ContactModel ContactTabular::at(SizeT i, SizeT j) const
+ContactModel ContactTabular::at(IndexT i, IndexT j) const
 {
     return m_impl->at(i, j);
 }

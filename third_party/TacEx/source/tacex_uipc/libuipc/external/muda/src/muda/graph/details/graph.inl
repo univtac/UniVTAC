@@ -188,8 +188,13 @@ MUDA_INLINE auto Graph::add_event_wait_node(cudaEvent_t e) -> S<EventWaitNode>
 
 MUDA_INLINE void Graph::add_dependency(S<GraphNode> from, S<GraphNode> to)
 {
+#if CUDA_VERSION < 13000
     checkCudaErrors(
         cudaGraphAddDependencies(m_handle, &(from->m_handle), &(to->m_handle), 1));
+#else
+        checkCudaErrors(
+            cudaGraphAddDependencies(m_handle, &(from->m_handle), &(to->m_handle), nullptr /*const cudaGraphEdgeData* edgeData*/, 1));
+#endif
 }
 
 MUDA_INLINE std::vector<cudaGraphNode_t> Graph::map_dependencies(const std::vector<S<GraphNode>>& deps)

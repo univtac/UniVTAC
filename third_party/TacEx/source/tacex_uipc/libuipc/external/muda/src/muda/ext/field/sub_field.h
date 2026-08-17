@@ -77,7 +77,6 @@ class SubField
 
   private:
     friend class Field;
-    friend class SubField;
     template <FieldEntryLayout Layout>
     friend class FieldBuilder;
     friend class FieldEntryBase;

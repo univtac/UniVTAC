@@ -1,0 +1,61 @@
+name: cmake
+
+on:
+  pull_request:
+    branches:
+      - "mini20"
+    paths-ignore:
+      - ".clang-format"
+      - ".clangd"
+      - ".gitignore"
+      - "LICENSE"
+      - "README.md"
+      - "docs/**"
+      - ".github/workflows/xmake.yml"
+      - "**/xmake.lua"
+      - "**/*.bazel"
+      - "**/*.bzl"
+      - "**/*.bazelrc"
+
+jobs:
+  build_and_test:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+
+    runs-on: ${{ matrix.os }}
+
+    concurrency:
+      group: ${{ github.ref }}-${{ github.base_ref }}-${{ github.head_ref }}-cmake-${{ matrix.os }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Maximize build space
+        if: matrix.os == 'ubuntu-22.04'
+        uses: AdityaGarg8/remove-unwanted-software@v4.1
+        with:
+          remove-android: "true"
+          remove-haskell: "true"
+          remove-codeql: "true"
+
+      - name: Setup cuda
+        uses: Jimver/cuda-toolkit@v0.2.28
+        id: cuda-toolkit
+        with:
+          cuda: "12.8.1"
+
+      - name: Setup ninja and Eigen3 on Ubuntu
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt update
+          sudo apt install ninja-build libeigen3-dev -y
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Build MUDA
+        run: |
+          cmake --preset ci-release
+          cmake --build --preset ci-release --parallel 4

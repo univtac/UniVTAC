@@ -81,8 +81,8 @@ void LinearSystemContext::gesv(DenseMatrixView<T> A, DenseVectorView<T> b)
     cusolverDnCreateParams(&params);
     cusolverDnSetAdvOptions(params, CUSOLVERDN_GETRF, CUSOLVER_ALG_0);
 
-    constexpr int pivot_on    = 1;
-    size_t        d_piv_count = A.row();
+    // constexpr int pivot_on    = 1;
+    size_t d_piv_count = A.row();
 
     checkCudaErrors(cusolverDnXgetrf_bufferSize(cusolver,
                                                 params,

@@ -23,9 +23,9 @@ For the sake of simplicity, we only launch one warp (even only 4 active thread).
             [] __device__()
             {
                 // get lane id using cooperative group
-                auto block = cg::this_thread_block();
+                auto block     = cg::this_thread_block();
                 auto this_warp = cg::tiled_partition<4>(block);
-                int lane_id = this_warp.thread_rank();
+                int  lane_id   = this_warp.thread_rank();
 
                 printf("[%d] lane_id: %d\n", lane_id, lane_id);
 

@@ -1,4 +1,4 @@
-#include <catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <app/asset_dir.h>
 #include <uipc/uipc.h>
 #include <uipc/constitution/stable_neo_hookean.h>
@@ -20,7 +20,7 @@ static void clear()
     auto        this_output_path = AssetDir::output_path(__FILE__);
     auto        dump_path        = fmt::format("{}/dump/", this_output_path);
     auto        count            = fs::remove_all(dump_path);
-    spdlog::info("Remove {} entries in {}", count, dump_path);
+    Logger::current_logger().info("Remove {} entries in {}", count, dump_path);
 }
 
 static void run(int I)

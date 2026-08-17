@@ -1,15 +1,19 @@
 #include <uipc/geometry/utils/octree.h>
 #include <uipc/common/vector.h>
 #include <uipc/common/enumerate.h>
+#if __has_include(<Octree/octree.h>)
 #include <Octree/octree.h>
 #include <Octree/adaptor.eigen.h>
+#else
+#include <octree.h>
+#include <adaptor.eigen.h>
+#endif
 #include <Eigen/Dense>
-
 namespace uipc::geometry
 {
 class Octree::Impl
 {
-    using OctreeBox = OrthoTree::EigenAdaptor::EigenOrthoTreeBox<Float, 3, 2>;
+    using OctreeBox = OrthoTree::EigenAdaptor::EigenOrthoTreeBox<Float, 3>;
 
   public:
     void build(span<const AABB> aabbs)

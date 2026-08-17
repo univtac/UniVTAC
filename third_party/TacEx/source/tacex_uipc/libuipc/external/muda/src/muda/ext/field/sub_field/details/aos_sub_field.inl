@@ -30,13 +30,6 @@ MUDA_INLINE void SubFieldImpl<FieldEntryLayout::AoS>::build_impl()
         e->m_core.m_info.struct_stride = m_struct_stride;
 }
 
-//MUDA_INLINE void SubFieldImpl<FieldEntryLayout::AoS>::resize(size_t num_elements)
-//{
-//    copy_resize_data_buffer(m_struct_stride * num_elements);
-//    for(auto& e : m_entries)
-//        e->m_core.m_info.elem_count = num_elements;
-//}
-
 MUDA_INLINE size_t SubFieldImpl<FieldEntryLayout::AoS>::require_total_buffer_byte_size(size_t num_element)
 {
     return m_struct_stride * num_element;

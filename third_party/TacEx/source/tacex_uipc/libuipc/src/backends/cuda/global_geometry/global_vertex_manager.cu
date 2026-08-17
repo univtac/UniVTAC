@@ -3,6 +3,7 @@
 #include <uipc/common/range.h>
 #include <muda/cub/device/device_reduce.h>
 #include <global_geometry/vertex_reporter.h>
+#include <sim_engine.h>
 
 /*************************************************************************************************
 * Core Implementation
@@ -11,6 +12,12 @@ namespace uipc::backend::cuda
 {
 REGISTER_SIM_SYSTEM(GlobalVertexManager);
 
+void GlobalVertexManager::do_build()
+{
+    auto d_hat = world().scene().config().find<Float>("contact/d_hat");
+    m_impl.default_d_hat = d_hat->view()[0];
+}
+
 void GlobalVertexManager::Impl::init()
 {
     auto vertex_reporter_view = vertex_reporters.view();
@@ -18,8 +25,6 @@ void GlobalVertexManager::Impl::init()
     // 1) Setup index for each vertex reporter
     for(auto&& [i, R] : enumerate(vertex_reporter_view))
         R->m_index = i;
-
-
 
     // 2) Count the number of vertices reported by each reporter
     auto N = vertex_reporter_view.size();
@@ -33,7 +38,6 @@ void GlobalVertexManager::Impl::init()
         R->report_count(info);
         // get count back
         reporter_vertex_counts[i] = info.m_count;
-        std::cout << "vertex_reporter i : " << i <<"\n";
     }
     reporter_vertex_offsets_counts.scan();
     SizeT total_count = reporter_vertex_offsets_counts.total_count();
@@ -44,17 +48,23 @@ void GlobalVertexManager::Impl::init()
     rest_positions.resize(total_count);
     safe_positions.resize(total_count);
     contact_element_ids.resize(total_count, 0);
+    subscene_element_ids.resize(total_count, 0);
     thicknesses.resize(total_count, 0.0);
     dimensions.resize(total_count, 3);  // default 3D
     displacements.resize(total_count, Vector3::Zero());
     displacement_norms.resize(total_count, 0.0);
     body_ids.resize(total_count, -1);  // -1 means no care about body id
+    d_hats.resize(total_count, default_d_hat);  // use default d_hat if not specified
 
     // 4) Create the subviews for each attribute_reporter,
     //    so that each reporter can write to its own subview
     for(auto&& [i, R] : enumerate(vertex_reporter_view))
     {
-        VertexAttributeInfo attributes{this, i};
+        VertexAttributeInfo attributes{
+            this,
+            i,
+            0  // frame = 0 for initialization
+        };
         R->report_attributes(attributes);
     }
 
@@ -64,6 +74,17 @@ void GlobalVertexManager::Impl::init()
 
     // 6) Other initializations
     axis_max_disp = 0.0;
+}
+
+void GlobalVertexManager::Impl::update_attributes(SizeT frame)
+{
+    auto vertex_reporter_view = vertex_reporters.view();
+
+    for(auto&& [i, R] : enumerate(vertex_reporter_view))
+    {
+        VertexAttributeInfo attributes{this, i, frame};
+        R->report_attributes(attributes);
+    }
 }
 
 void GlobalVertexManager::Impl::rebuild()
@@ -82,7 +103,7 @@ void GlobalVertexManager::Impl::step_forward(Float alpha)
     using namespace muda;
 
     ParallelFor()
-        .kernel_name(__FUNCTION__)
+        .file_line(__FILE__, __LINE__)
         .apply(positions.size(),
                [pos      = positions.viewer().name("pos"),
                 safe_pos = safe_positions.viewer().name("safe_pos"),
@@ -150,7 +171,7 @@ AABB GlobalVertexManager::Impl::compute_vertex_bounding_box()
     min_pos_host = min_pos;
     max_pos_host = max_pos;
 
-    vertex_bounding_box = AABB{min_pos_host, max_pos_host};
+    vertex_bounding_box = AABB{min_pos_host.cast<float>(), max_pos_host.cast<float>()};
     return vertex_bounding_box;
 }
 }  // namespace uipc::backend::cuda
@@ -187,26 +208,6 @@ void GlobalVertexManager::Impl::clear_recover(RecoverInfo& info)
     dump_positions.clean_up();
     dump_prev_positions.clean_up();
 }
-
-bool GlobalVertexManager::Impl::write_vertex_pos_to_sim(span<const Vector3> new_positions, IndexT global_vertex_offset, SizeT vertex_count) //span<const IndexT> global_vertex_indices, 
-{
-
-    std::cout << "write vertex pos in GlobalVertexManager: " <<"\n";
-
-    std::cout << "global vertex counts total: " << reporter_vertex_offsets_counts.total_count() <<"\n";
-
-    std::cout << "global vertex offsets test: " <<"\n";
-    for(auto idx: reporter_vertex_offsets_counts.counts()) {
-        std::cout << idx << "\n";
-    }
-
-    std::cout << "global vertex offset: " << global_vertex_offset << ", vertex count: " << vertex_count << "\n";
-    positions.view(global_vertex_offset, vertex_count).copy_from(new_positions.data());
-    prev_positions.view(global_vertex_offset, vertex_count).copy_from(new_positions.data());
-
-    return true;
-}
-
 }  // namespace uipc::backend::cuda
 
 
@@ -225,9 +226,10 @@ void GlobalVertexManager::VertexCountInfo::changeable(bool is_changable) noexcep
     m_changable = is_changable;
 }
 
-GlobalVertexManager::VertexAttributeInfo::VertexAttributeInfo(Impl* impl, SizeT index) noexcept
+GlobalVertexManager::VertexAttributeInfo::VertexAttributeInfo(Impl* impl, SizeT index, SizeT frame) noexcept
     : m_impl(impl)
     , m_index(index)
+    , m_frame(frame)
 {
 }
 
@@ -261,9 +263,24 @@ muda::BufferView<IndexT> GlobalVertexManager::VertexAttributeInfo::contact_eleme
     return m_impl->subview(m_impl->contact_element_ids, m_index);
 }
 
+muda::BufferView<IndexT> GlobalVertexManager::VertexAttributeInfo::subscene_element_ids() const noexcept
+{
+    return m_impl->subview(m_impl->subscene_element_ids, m_index);
+}
+
 muda::BufferView<IndexT> GlobalVertexManager::VertexAttributeInfo::body_ids() const noexcept
 {
     return m_impl->subview(m_impl->body_ids, m_index);
+}
+
+muda::BufferView<Float> GlobalVertexManager::VertexAttributeInfo::d_hats() const noexcept
+{
+    return m_impl->subview(m_impl->d_hats, m_index);  // Assuming d_hats are stored in thicknesses
+}
+
+SizeT GlobalVertexManager::VertexAttributeInfo::frame() const noexcept
+{
+    return m_frame;
 }
 
 GlobalVertexManager::VertexDisplacementInfo::VertexDisplacementInfo(Impl* impl, SizeT index) noexcept
@@ -281,8 +298,6 @@ muda::CBufferView<IndexT> GlobalVertexManager::VertexDisplacementInfo::coindices
 {
     return m_impl->subview(m_impl->coindices, m_index);
 }
-
-void GlobalVertexManager::do_build() {}
 
 bool GlobalVertexManager::do_dump(DumpInfo& info)
 {
@@ -304,14 +319,14 @@ void GlobalVertexManager::do_clear_recover(RecoverInfo& info)
     m_impl.clear_recover(info);
 }
 
-bool GlobalVertexManager::do_write_vertex_pos_to_sim(span<const Vector3> new_positions, IndexT global_vertex_offset, SizeT vertex_count)
-{
-    return m_impl.write_vertex_pos_to_sim(new_positions, global_vertex_offset, vertex_count);
-}
-
 void GlobalVertexManager::init()
 {
     m_impl.init();
+}
+
+void GlobalVertexManager::update_attributes()
+{
+    m_impl.update_attributes(engine().frame());
 }
 
 void GlobalVertexManager::rebuild()
@@ -339,6 +354,11 @@ muda::CBufferView<IndexT> GlobalVertexManager::body_ids() const noexcept
     return m_impl.body_ids;
 }
 
+muda::CBufferView<Float> GlobalVertexManager::d_hats() const noexcept
+{
+    return m_impl.d_hats;
+}
+
 muda::CBufferView<Vector3> GlobalVertexManager::positions() const noexcept
 {
     return m_impl.positions;
@@ -362,6 +382,11 @@ muda::CBufferView<Vector3> GlobalVertexManager::safe_positions() const noexcept
 muda::CBufferView<IndexT> GlobalVertexManager::contact_element_ids() const noexcept
 {
     return m_impl.contact_element_ids;
+}
+
+muda::CBufferView<IndexT> GlobalVertexManager::subscene_element_ids() const noexcept
+{
+    return m_impl.subscene_element_ids;
 }
 
 muda::CBufferView<Vector3> GlobalVertexManager::displacements() const noexcept

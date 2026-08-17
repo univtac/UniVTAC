@@ -19,8 +19,8 @@ class FieldEntryLaunch : public LaunchBase<FieldEntryLaunch>
     * 
     **********************************************************************************************/
     template <typename T, FieldEntryLayout DstLayout, FieldEntryLayout SrcLayout, int M, int N>
-    MUDA_HOST FieldEntryLaunch& copy(FieldEntryView<T, DstLayout, M, N>  dst,
-                                     CFieldEntryView<T, SrcLayout, M, N> src);
+    MUDA_HOST FieldEntryLaunch& copy(const FieldEntryViewT<false, T, DstLayout, M, N>& dst,
+                                     const FieldEntryViewT<true, T, SrcLayout, M, N>& src);
 
     /**********************************************************************************************
     *   
@@ -28,8 +28,9 @@ class FieldEntryLaunch : public LaunchBase<FieldEntryLaunch>
     *   
     * *********************************************************************************************/
     template <typename T, FieldEntryLayout DstLayout, int M, int N>
-    MUDA_HOST FieldEntryLaunch& fill(FieldEntryView<T, DstLayout, M, N> dst,
-                                     const typename FieldEntryView<T, DstLayout, M, N>::ElementType& value);
+    MUDA_HOST FieldEntryLaunch& fill(
+        const FieldEntryViewT<false, T, DstLayout, M, N>& dst,
+        const typename FieldEntryViewT<true, T, DstLayout, M, N>::ValueT& value);
 
     /**********************************************************************************************
     *   
@@ -38,8 +39,8 @@ class FieldEntryLaunch : public LaunchBase<FieldEntryLaunch>
     * *********************************************************************************************/
     template <typename T, FieldEntryLayout SrcLayout, int M, int N>
     MUDA_HOST FieldEntryLaunch& copy(
-        BufferView<typename CFieldEntryView<T, SrcLayout, M, N>::ElementType> dst,
-        CFieldEntryView<T, SrcLayout, M, N> src);
+        BufferView<typename FieldEntryViewT<true, T, SrcLayout, M, N>::ValueT> dst,
+        const FieldEntryViewT<true, T, SrcLayout, M, N>& src);
 
     /**********************************************************************************************
     *   
@@ -48,8 +49,8 @@ class FieldEntryLaunch : public LaunchBase<FieldEntryLaunch>
     * *********************************************************************************************/
     template <typename T, FieldEntryLayout DstLayout, int M, int N>
     MUDA_HOST FieldEntryLaunch& copy(
-        FieldEntryView<T, DstLayout, M, N> dst,
-        CBufferView<typename FieldEntryView<T, DstLayout, M, N>::ElementType> src);
+        const FieldEntryViewT<false, T, DstLayout, M, N>& dst,
+        CBufferView<typename FieldEntryViewT<true, T, DstLayout, M, N>::ValueT> src);
 };
 }  // namespace muda
 

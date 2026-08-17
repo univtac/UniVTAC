@@ -31,3 +31,5 @@ policy/ACT_UniT
 /policy/**/*.ckpt
 
 /.env
+/.venv/
+/.cache/

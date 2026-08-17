@@ -145,21 +145,85 @@ class FieldEntryViewerCore : protected ViewerBase<IsConst>
                            this->total_count());
     }
 };
-}  // namespace muda
 
-
-namespace muda
-{
-// forward declaration
 template <bool IsConst, typename T, FieldEntryLayout Layout, int M, int N>
-class FieldEntryViewerBase;
-template <typename T, FieldEntryLayout Layout, int M, int N>
-class FieldEntryViewer;
-template <typename T, FieldEntryLayout Layout, int M, int N>
-class CFieldEntryViewer;
-}  // namespace muda
+class FieldEntryViewerT : public FieldEntryViewerCore<IsConst, T, Layout, M, N>
+{
+    MUDA_VIEWER_COMMON_NAME(FieldEntryViewerT);
 
-// implementation
-#include "details/entry_viewers/field_entry_viewer_matrix.inl"
-#include "details/entry_viewers/field_entry_viewer_vector.inl"
-#include "details/entry_viewers/field_entry_viewer_scalar.inl"
+    using Base = FieldEntryViewerCore<IsConst, T, Layout, M, N>;
+
+    template <typename U>
+    using auto_const_t = typename Base::template auto_const_t<U>;
+
+  public:
+    using ConstViewer    = FieldEntryViewerT<true, T, Layout, M, N>;
+    using NonConstViewer = FieldEntryViewerT<false, T, Layout, M, N>;
+    using ThisViewer     = FieldEntryViewerT<IsConst, T, Layout, M, N>;
+
+    using ConstMatrixMap = typename Base::ConstMatMap;
+    using ThisMatrixMap  = typename Base::ThisMatMap;
+
+    using Base::Base;
+
+
+    MUDA_GENERIC FieldEntryViewerT(const Base& base)
+        : Base(base)
+    {
+    }
+
+    template <bool OtherIsConst>
+    MUDA_GENERIC FieldEntryViewerT(const FieldEntryViewerT<OtherIsConst, T, Layout, M, N>& other) MUDA_NOEXCEPT
+        MUDA_REQUIRES(!OtherIsConst)
+        : Base(other)
+    {
+        static_assert(!OtherIsConst, "Cannot construct const view from non-const view");
+    }
+
+    MUDA_GENERIC auto as_const() const { return ConstViewer{this->m_core}; }
+
+    MUDA_GENERIC auto_const_t<T>* data(int i) const MUDA_REQUIRES(M == 1 && N == 1)
+    {
+        static_assert(M == 1 && N == 1, "data(i) is only available for scalar entries");
+        return Base::data(i);
+    }
+
+    MUDA_GENERIC auto_const_t<T>* data(int i, int j) const MUDA_REQUIRES(M > 1 && N == 1)
+    {
+        static_assert(M > 1 && N == 1, "data(i,j) is only available for vector entries");
+        return Base::data(i, j);
+    }
+
+    MUDA_GENERIC auto_const_t<T>* data(int i, int row_index, int col_index) const
+        MUDA_REQUIRES(M > 1 && N > 1)
+    {
+        static_assert(M > 1 && N > 1, "data(i,row_index,coll_index) is only available for matrix entries");
+        return Base::data(i, row_index, col_index);
+    }
+
+    MUDA_GENERIC decltype(auto) operator()(int i) const
+    {
+        if constexpr(M == 1 && N == 1)
+        {
+            return *data(i);
+        }
+        else if constexpr(M > 1 && N == 1)
+        {
+            return ThisMatrixMap{data(i, 0), this->m_stride};
+        }
+        else if constexpr(M > 1 && N > 1)
+        {
+            return ThisMatrixMap{data(i, 0, 0), this->m_stride};
+        }
+        else
+        {
+            static_assert("invalid M, N");
+        }
+    }
+};
+
+template <typename T, FieldEntryLayout Layout, int M, int N>
+using FieldEntryViewer = FieldEntryViewerT<false, T, Layout, M, N>;
+template <typename T, FieldEntryLayout Layout, int M, int N>
+using CFieldEntryViewer = FieldEntryViewerT<true, T, Layout, M, N>;
+}  // namespace muda

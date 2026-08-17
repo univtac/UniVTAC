@@ -31,4 +31,12 @@
 // }
 #define $node(name) create_node(name) << [&]
 
+// usage:
+// ParallelFor()
+// .$kernel_name()
 #define $kernel_name() kernel_name(__FUNCTION__)
+
+// usage:
+// ParallelFor()
+// .$file_line()
+#define $file_line() file_line(__FILE__, __LINE__)

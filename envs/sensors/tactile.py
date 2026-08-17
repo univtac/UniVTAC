@@ -1,4 +1,5 @@
 import torch
+from typing import TYPE_CHECKING, Literal
 from envs.utils import data
 import numpy as np
 from tacex import GelSightSensor, GelSightSensorCfg
@@ -16,17 +17,14 @@ from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.assets import Articulation, ArticulationCfg, AssetBaseCfg, RigidObject, RigidObjectCfg
 
 from tacex_uipc import (
-    UipcRLEnv,
     UipcIsaacAttachments,
     UipcIsaacAttachmentsCfg,
-    UipcObject,
-    UipcObjectCfg,
-    UipcSimCfg
+    UipcDeformableObject,
+    UipcDeformableObjectCfg,
 )
 
 from ..utils.transforms import *
 
-from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .._base_task import BaseTask
     from tacex_uipc.sim import UipcIsaacAttachmentsCfg, UipcSim
@@ -36,7 +34,7 @@ if TYPE_CHECKING:
 class TactileCfg:
     name: str = 'tactile_sensor'
     sensor_cfg = None
-    gelpad_cfg: UipcObjectCfg = None
+    gelpad_cfg: UipcDeformableObjectCfg = None
     gelpad_attachment_cfg: UipcIsaacAttachmentsCfg = None
 
 def create_gelsight_mini_cfg(
@@ -47,21 +45,33 @@ def create_gelsight_mini_cfg(
     resolution = (320, 240),
     update_period = 1/120,
     data_type:list[str] = ["camera_depth", "tactile_rgb"],
+    optical_backend: Literal["taxim", "pix2pix"] = "taxim",
 ):
-    from tacex_assets.sensors.gelsight_mini.gsmini_cfg import GelSightMiniCfg
-    sensor_cfg = GelSightMiniCfg(
+    from tacex_assets.sensors.gelsight_mini import GELSIGHT_MINI_PIX2PIX_CFG, GELSIGHT_MINI_TAXIM_CFG
+    from tacex.simulation_approaches.fem_based.sim.gelpad_info import CONSTRAIN_PTS
+
+    if optical_backend == "taxim":
+        sensor_cfg = GELSIGHT_MINI_TAXIM_CFG.copy()
+    elif optical_backend == "pix2pix":
+        sensor_cfg = GELSIGHT_MINI_PIX2PIX_CFG.copy()
+    else:
+        raise ValueError(f"Unknown GelSight optical backend: {optical_backend!r}")
+
+    sensor_cfg = sensor_cfg.replace(
         prim_path=prim_path,
-        sensor_camera_cfg=GelSightMiniCfg.SensorCameraCfg(
-            prim_path_appendix="/Camera",
+        sensor_camera_cfg=sensor_cfg.SensorCameraCfg(
+            prim_name="Camera",
             resolution=resolution,
             update_period=update_period,
             data_types=["depth", "rgb"],
             clipping_range=(0.024, 0.034),
+            update_latest_camera_pose=True,
         ),
         device="cuda",
         debug_vis=False,  # for rendering sensor output in the gui
         update_period=1/120,
         marker_motion_sim_cfg=ManiSkillSimulatorCfg(
+            device="cuda",
             tactile_img_res=resolution,
             marker_shape=(9, 7),
             marker_interval=(2.40625, 2.45833),
@@ -71,26 +81,35 @@ def create_gelsight_mini_cfg(
             real_size=(0.0266, 0.0209),
             sensor_type='gsmini',
         ),
-        data_types=data_type
+        data_types=data_type,
     )
-    sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = 64
+    sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = (
+        sensor_cfg.marker_motion_sim_cfg.marker_shape[0]
+        * sensor_cfg.marker_motion_sim_cfg.marker_shape[1]
+    )
     sensor_cfg.optical_sim_cfg = sensor_cfg.optical_sim_cfg.replace(
-        with_shadow=False,
         tactile_img_res=resolution,
         device="cuda",
     )
+    if optical_backend == "taxim":
+        sensor_cfg.optical_sim_cfg.with_shadow = False
+        sensor_cfg.compute_indentation_depth_class = "optical_sim"
+    else:
+        sensor_cfg.compute_indentation_depth_class = "default"
 
     cfg = TactileCfg(
         name=name,
         sensor_cfg=sensor_cfg,
-        gelpad_cfg=UipcObjectCfg(
+        gelpad_cfg=UipcDeformableObjectCfg(
             prim_path=gelpad_prim_path,
-            constitution_cfg=UipcObjectCfg.StableNeoHookeanCfg(youngs_modulus=0.1),
+            constitution_cfg=UipcDeformableObjectCfg.StableNeoHookeanCfg(youngs_modulus=0.1),
             mass_density=1e4
         ),
         gelpad_attachment_cfg=UipcIsaacAttachmentsCfg(
             constraint_strength_ratio=1e4,
             body_name=gelpad_attachment_body_name,
+            isaaclab_rigid_body_prim_path=gelpad_prim_path.rsplit("/", 1)[0],
+            attachment_point_indices=CONSTRAIN_PTS["gsmini"].tolist(),
             debug_vis=False,
         ),
     )
@@ -110,7 +129,7 @@ def create_gf225_cfg(
     sensor_cfg = GF225Cfg(
         prim_path=prim_path,
         sensor_camera_cfg=GF225Cfg.SensorCameraCfg(
-            prim_path_appendix="/Camera",
+            prim_name="Camera",
             resolution=resolution,
             update_period=update_period,
             data_types=["depth"],
@@ -145,15 +164,15 @@ def create_gf225_cfg(
     cfg = TactileCfg(
         name=name,
         sensor_cfg=sensor_cfg,
-        gelpad_cfg=UipcObjectCfg(
+        gelpad_cfg=UipcDeformableObjectCfg(
             prim_path=gelpad_prim_path,
-            constitution_cfg=UipcObjectCfg.StableNeoHookeanCfg(youngs_modulus=0.1),
+            constitution_cfg=UipcDeformableObjectCfg.StableNeoHookeanCfg(youngs_modulus=0.1),
             mass_density=1e4
         ),
         gelpad_attachment_cfg=UipcIsaacAttachmentsCfg(
             constraint_strength_ratio=1e4,
             body_name=gelpad_attachment_body_name,
-            isaac_rigid_prim_path=gelpad_attachment_prim_path,
+            isaaclab_rigid_body_prim_path=gelpad_attachment_prim_path or gelpad_prim_path.rsplit("/", 1)[0],
             debug_vis=False,
         ),
     )
@@ -174,7 +193,7 @@ def create_xensews_cfg(
     sensor_cfg = XenseWSCfg(
         prim_path=prim_path,
         sensor_camera_cfg=XenseWSCfg.SensorCameraCfg(
-            prim_path_appendix="/Camera",
+            prim_name="Camera",
             update_period=update_period,
             resolution=resolution,
             data_types=["depth", "rgb"],
@@ -205,15 +224,15 @@ def create_xensews_cfg(
     cfg = TactileCfg(
         name=name,
         sensor_cfg=sensor_cfg,
-        gelpad_cfg=UipcObjectCfg(
+        gelpad_cfg=UipcDeformableObjectCfg(
             prim_path=gelpad_prim_path,
-            constitution_cfg=UipcObjectCfg.StableNeoHookeanCfg(youngs_modulus=0.1),
+            constitution_cfg=UipcDeformableObjectCfg.StableNeoHookeanCfg(youngs_modulus=0.1),
             mass_density=1e4
         ),
         gelpad_attachment_cfg=UipcIsaacAttachmentsCfg(
             constraint_strength_ratio=1e4,
             body_name=gelpad_attachment_body_name,
-            isaac_rigid_prim_path=gelpad_attachment_prim_path,
+            isaaclab_rigid_body_prim_path=gelpad_attachment_prim_path or gelpad_prim_path.rsplit("/", 1)[0],
             debug_vis=False,
         ),
     )
@@ -227,6 +246,7 @@ def create_tactile_cfg(
     name: str = "tactile_sensor",
     sensor_type:Literal['gsmini', 'xensews', 'gf225'] = "gsmini",
     data_type:list[str] = ["camera_depth", "tactile_rgb"],
+    optical_backend: Literal["taxim", "pix2pix"] = "taxim",
 ) -> TactileCfg:
     if sensor_type == "gsmini":
         return create_gelsight_mini_cfg(
@@ -235,6 +255,7 @@ def create_tactile_cfg(
             gelpad_attachment_body_name=gelpad_attachment_body_name,
             name=name,
             data_type=data_type,
+            optical_backend=optical_backend,
         )
     elif sensor_type == "xensews":
         return create_xensews_cfg(
@@ -265,10 +286,10 @@ class VisualTactileSensor:
         self.robot = robot
         self.uipc_sim = uipc_sim
 
-        self.gelpad = UipcObject(self.cfg.gelpad_cfg, self.uipc_sim)
-        self.attachment = UipcIsaacAttachments(
-            self.cfg.gelpad_attachment_cfg, self.gelpad, self.robot
-        )
+        self.cfg.gelpad_cfg.constraint_cfg = self.cfg.gelpad_attachment_cfg
+        self.gelpad = UipcDeformableObject(self.cfg.gelpad_cfg, self.uipc_sim)
+        self.attachment: UipcIsaacAttachments = self.gelpad.constraint
+        self.attachment.isaaclab_rigid_object = self.robot
         self.sensor = GelSightSensor(self.cfg.sensor_cfg, self.gelpad)
         # self.scene.sensors[f'tactile_{self.cfg.name}'] = self.sensor
     
@@ -287,12 +308,14 @@ class VisualTactileSensor:
             # this only works when rigid body is an articulation
             # self.attachment.isaaclab_rigid_object._physics_sim_view.update_articulations_kinematic()
             # read data from simulation
-            poses = self.attachment.isaaclab_rigid_object._root_physx_view.get_link_transforms().clone()
+            poses = self.attachment.isaaclab_rigid_object.root_physx_view.get_link_transforms().clone()
             poses[..., 3:7] = math_utils.convert_quat(poses[..., 3:7], to="wxyz")
             pose = poses[:, self.attachment.rigid_body_id, 0:7].clone()
         elif type(self.attachment.isaaclab_rigid_object) is RigidObject:
             # only works with rigid body
-            pose = self.attachment.isaaclab_rigid_object._root_physx_view.root_state_w.view(-1, 1, 13)
+            pose = self.attachment.isaaclab_rigid_object.root_physx_view.get_transforms().clone()
+            pose[..., 3:7] = math_utils.convert_quat(pose[..., 3:7], to="wxyz")
+            pose = pose.view(-1, 1, 7)
             pose = pose[:, self.attachment.rigid_body_id, 0:7].clone()
         else:
             raise RuntimeError("Need an Articulation or a RigidBody object for the Isaac X UIPC attachment.")

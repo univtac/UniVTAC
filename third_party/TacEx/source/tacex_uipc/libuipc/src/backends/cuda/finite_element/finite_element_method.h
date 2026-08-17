@@ -233,9 +233,7 @@ class FiniteElementMethod final : public SimSystem
         bool try_recover(RecoverInfo& info);
         void apply_recover(RecoverInfo& info);
         void clear_recover(RecoverInfo& info);
-        
-        bool write_vertex_pos_to_sim(span<const Vector3> positions, IndexT vertex_offset, SizeT vertex_count);
-        
+
         // Forward Simulation:
 
         GlobalVertexManager* global_vertex_manager = nullptr;
@@ -253,6 +251,7 @@ class FiniteElementMethod final : public SimSystem
         // Core Invariant Data:
 
         vector<GeoInfo> geo_infos;
+
 
         // Related Data:
 
@@ -279,6 +278,8 @@ class FiniteElementMethod final : public SimSystem
         // Simulation Data:
 
         vector<IndexT> h_vertex_contact_element_ids;
+        vector<IndexT> h_vertex_subscene_contact_element_ids;
+        vector<Float>  h_vertex_d_hat;
 
         vector<IndexT>  h_vertex_is_fixed;
         vector<IndexT>  h_vertex_is_dynamic;
@@ -300,6 +301,7 @@ class FiniteElementMethod final : public SimSystem
         vector<IndexT> h_body_self_collision;
 
         Vector3 default_gravity;
+        Float   default_d_hat;
 
 
         // Element Attributes:
@@ -459,6 +461,8 @@ class FiniteElementMethod final : public SimSystem
     friend class FEMAdjointMethodReplayer;
     friend class FEMTimeIntegrator;
 
+    friend class FiniteElementStateAccessorFeatureOverrider;
+
     friend class SimEngine;
     void init();  // only be called by SimEngine
 
@@ -491,13 +495,11 @@ class FiniteElementMethod final : public SimSystem
                           ForEachGeometry&&               for_each);
 
     virtual void do_build() override;
-    
+
     virtual bool do_dump(DumpInfo& info) override;
     virtual bool do_try_recover(RecoverInfo& info) override;
     virtual void do_apply_recover(RecoverInfo& info) override;
     virtual void do_clear_recover(RecoverInfo& info) override;
-
-    virtual bool do_write_vertex_pos_to_sim(span<const Vector3> positions, IndexT vertex_offset, SizeT vertex_count);
 
     Impl m_impl;
 };

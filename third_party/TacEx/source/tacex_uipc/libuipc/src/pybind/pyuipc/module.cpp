@@ -18,6 +18,10 @@
 #include <pyuipc/backend/buffer_view.h>
 #include <pyuipc/backend/buffer.h>
 #include <pyuipc/core/feature.h>
+#include <pyuipc/common/resident_thread.h>
+#if UIPC_WITH_USD_SUPPORT
+#include <pyuipc/usd/module.h>
+#endif
 
 using namespace uipc;
 
@@ -43,6 +47,7 @@ PYBIND11_MODULE(pyuipc, m)
     auto core         = m.def_submodule("core");
     auto backend      = m.def_submodule("backend");
     auto builtin      = m.def_submodule("builtin");
+    auto usd          = m.def_submodule("usd");
 
     // pyuipc
     m.doc() = "Libuipc Python Binding";
@@ -64,6 +69,7 @@ PYBIND11_MODULE(pyuipc, m)
     pyuipc::PyLogger{m};
     pyuipc::PyTransform{m};
     pyuipc::PyTimer{m};
+    pyuipc::PyResidentThread{m};
 
     // early expose buffer view
     pyuipc::backend::PyBufferView{backend};
@@ -98,4 +104,9 @@ PYBIND11_MODULE(pyuipc, m)
 
     // pyuipc.builtin
     pyuipc::builtin::PyModule{builtin};
+
+    // pyuipc.usd
+#if UIPC_WITH_USD_SUPPORT
+    pyuipc::usd::PyModule{usd};
+#endif
 }

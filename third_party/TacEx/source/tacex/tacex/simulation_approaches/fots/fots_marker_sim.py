@@ -32,12 +32,13 @@ class FOTSMarkerSimulator(GelSightSimulator):
     cfg: FOTSMarkerSimulatorCfg
 
     def __init__(self, sensor: GelSightSensor, cfg: FOTSMarkerSimulatorCfg):
-        self.sensor: GelSightSensor = sensor
-
         super().__init__(sensor=sensor, cfg=cfg)
 
         # use IsaacLab FrameTransformer for keeping track of relative position/rotation
-        self.frame_transformer: FrameTransformer = FrameTransformer(self.cfg.frame_transformer_cfg)
+        if self.cfg.frame_transformer_cfg is not None:
+            self.frame_transformer: FrameTransformer = FrameTransformer(self.cfg.frame_transformer_cfg)
+        else:
+            self.frame_transformer = None
 
     def _initialize_impl(self):
         if self.cfg.device is None:
@@ -104,9 +105,10 @@ class FOTSMarkerSimulator(GelSightSimulator):
         self.theta = torch.zeros((self.sensor._num_envs), device=self._device)
 
         # need to initialize manually
-        self.frame_transformer._initialize_impl()
-        self.frame_transformer._is_initialized = True
-        print("Frame transformer for FOTS: ", self.frame_transformer)
+        if self.frame_transformer is not None:
+            self.frame_transformer._initialize_impl()
+            self.frame_transformer._is_initialized = True
+            print("Frame transformer for FOTS: ", self.frame_transformer)
 
         # for visualization of the markers
         self.patch_array_dict = copy.deepcopy(generate_patch_array())
@@ -144,19 +146,22 @@ class FOTSMarkerSimulator(GelSightSimulator):
                 # print("should be ", mean[1], mean[0])
 
                 # rel position/orientation of obj to sensor
-                self.frame_transformer.update(dt=0.001)
-                rel_pos = self.frame_transformer.data.target_pos_source.cpu().numpy()[
-                    env_id, 0, :
-                ]  # target_pos_source shape is (num_envs, num_targets, 3)
-                rel_pos *= 1000  # convert to mm
+                if self.frame_transformer is not None:
+                    self.frame_transformer.update(dt=0.001)
+                    rel_pos = self.frame_transformer.data.target_pos_source.cpu().numpy()[
+                        env_id, 0, :
+                    ]  # target_pos_source shape is (num_envs, num_targets, 3)
+                    rel_pos *= 1000  # convert to mm
 
-                # print("rel_pos in pix ", self.cfg.mm_to_pixel*rel_pos[0] + self.marker_motion_sim.tactile_img_width/2, self.cfg.mm_to_pixel*rel_pos[1] + self.marker_motion_sim.tactile_img_height/2)
-                # print("rel_pos ", rel_pos)
-                rel_orient = self.frame_transformer.data.target_quat_source[
-                    env_id
-                ]  # currently only one target_frame is used
-                roll, pitch, yaw = euler_xyz_from_quat(rel_orient)
-                theta = yaw.cpu().numpy()[0]  # TODO -> currently only can use the first target_frame
+                    # print("rel_pos in pix ", self.cfg.mm_to_pixel*rel_pos[0] + self.marker_motion_sim.tactile_img_width/2, self.cfg.mm_to_pixel*rel_pos[1] + self.marker_motion_sim.tactile_img_height/2)
+                    # print("rel_pos ", rel_pos)
+                    rel_orient = self.frame_transformer.data.target_quat_source[
+                        env_id
+                    ]  # currently only one target_frame is used
+                    roll, pitch, yaw = euler_xyz_from_quat(rel_orient)
+                    theta = yaw.cpu().numpy()[0]  # TODO -> currently only can use the first target_frame
+                else:
+                    theta = 0.0
                 # print("rel yaw in deg ", np.rad2deg(theta))
 
                 # order of traj depends on the source frame. With our definition, we need [y,-x,theta]

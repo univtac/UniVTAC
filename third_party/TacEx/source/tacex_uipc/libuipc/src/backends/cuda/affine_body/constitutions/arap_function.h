@@ -1,7 +1,7 @@
 #pragma once
 #include <muda/ext/eigen/eigen_core_cxx20.h>
 #include <muda/ext/eigen/svd.h>
-
+#include <finite_element/matrix_utils.h>
 namespace uipc::backend::cuda
 {
 namespace sym::abd_arap
@@ -29,14 +29,14 @@ namespace sym::abd_arap
         Eigen::Matrix<T, 3, 3> R;
         Eigen::Matrix<T, 3, 3> U, V;
         Eigen::Vector3<T>      Sigma;
-        muda::eigen::svd(F, U, Sigma, V);
+        svd(F, U, Sigma, V);
         R      = U * V.transpose();
         energy = kappa * (F - R).squaredNorm();
     }
 
     // Function to compute the gradient of the ARAP energy
     template <typename T>
-    __host__ __device__ void dEdq(Eigen::Vector<T, 9>&        gradient,
+    __host__ __device__ void dEdq(Eigen::Vector<T, 9>&        gradients,
                                   const T&                    kappa,
                                   const Eigen::Vector<T, 12>& q)
     {
@@ -45,7 +45,7 @@ namespace sym::abd_arap
         Eigen::Matrix<T, 3, 3> R;
         Eigen::Matrix<T, 3, 3> U, V;
         Eigen::Vector3<T>      Sigma;
-        muda::eigen::svd(F, U, Sigma, V);
+        svd(F, U, Sigma, V);
         R = U * V.transpose();
 
         Eigen::Matrix<T, 3, 3> dPsi_dF = 2 * (F - R);
@@ -54,7 +54,7 @@ namespace sym::abd_arap
         {
             for(int j = 0; j < 3; ++j)
             {
-                gradient(i * 3 + j) = kappa * dPsi_dF(i, j);
+                gradients(i * 3 + j) = kappa * dPsi_dF(i, j);
             }
         }
     }
@@ -76,7 +76,7 @@ namespace sym::abd_arap
     {
         Eigen::Matrix<T, 3, 3> U, V;
         Eigen::Vector3<T>      Sigma;
-        muda::eigen::svd(F, U, Sigma, V);
+        svd(F, U, Sigma, V);
         // Define the twist modes
         Eigen::Matrix<T, 3, 3> T0, T1, T2;
         T0.row(0) = Eigen::Vector3<T>(0, -1, 0);
@@ -112,14 +112,14 @@ namespace sym::abd_arap
     }
     // Function to compute the Hessian of the ARAP energy
     template <typename T>
-    __host__ __device__ void ddEddq(Eigen::Matrix<T, 9, 9>&     hessian,
+    __host__ __device__ void ddEddq(Eigen::Matrix<T, 9, 9>&     hessians,
                                     const T&                    kappa,
                                     const Eigen::Vector<T, 12>& q)
     {
         Eigen::Matrix<T, 3, 3> F;
         extractF(F, q);
-        ARAP_Hessian(hessian, F);
-        hessian *= kappa;
+        ARAP_Hessian(hessians, F);
+        hessians *= kappa;
     }
 
 }  // namespace sym::abd_arap

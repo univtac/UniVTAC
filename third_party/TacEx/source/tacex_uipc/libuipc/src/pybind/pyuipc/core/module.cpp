@@ -13,20 +13,23 @@
 #include <pyuipc/core/sanity_checker.h>
 #include <pyuipc/core/feature_collection.h>
 #include <pyuipc/core/contact_system_feature.h>
+#include <pyuipc/core/subscene_tabular.h>
+#include <pyuipc/core/state_accessor_feature.h>
 
 namespace pyuipc::core
 {
 PyModule::PyModule(py::module& m)
 {
-
     PyFeatureCollection{m};
     PyContactSystemFeature{m};
+    PyStateAccessorFeature{m};
 
     PyEngine{m};
 
     PyObject{m};
 
     PyContactTabular{m};
+    PySubsceneTabular{m};
     PyConstitutionTabular{m};
 
     PyAnimator{m};

@@ -79,18 +79,6 @@ void GlobalLinearSystem::solve()
     m_impl.distribute_solution();
 }
 
-void GlobalLinearSystem::prepare_hessian()
-{
-    Timer timer{"Build Linear System"};
-    m_impl.empty_system = !m_impl._update_subsystem_extent();
-    // if empty, skip the following steps
-    if(m_impl.empty_system) [[unlikely]]
-        return;
-
-    m_impl._assemble_linear_system();
-    m_impl.converter.convert(m_impl.triplet_A, m_impl.bcoo_A);
-}
-
 void GlobalLinearSystem::Impl::init()
 {
     auto diag_subsystem_view = diag_subsystems.view();
@@ -243,7 +231,7 @@ bool GlobalLinearSystem::Impl::_update_subsystem_extent()
             triplet_count_changed |= subsystem_triplet_counts[triplet_i] != total_block_count;
             subsystem_triplet_counts[triplet_i] = total_block_count;
             off_diag_lr_triplet_counts[subsystem_info.local_index] =
-                ulonglong2{info.m_lr_block_count, info.m_rl_block_count};
+                SizeT2{info.m_lr_block_count, info.m_rl_block_count};
         }
     }
 
@@ -282,7 +270,7 @@ bool GlobalLinearSystem::Impl::_update_subsystem_extent()
 
     if(total_dof == 0 || total_triplet == 0) [[unlikely]]
     {
-        spdlog::warn("The global linear system is empty, skip *assembling, *solving and *solution distributing phase.");
+        logger::warn("The global linear system is empty, skip *assembling, *solving and *solution distributing phase.");
         return false;
     }
 
@@ -322,10 +310,10 @@ void GlobalLinearSystem::Impl::_assemble_linear_system()
 
             info.m_index        = triplet_i;
             info.m_storage_type = HessianStorageType::Full;
-            info.m_gradient     = B.subview(dof_offset, dof_count);
-            info.m_hessian = HA.subview(subsystem_triplet_offsets[triplet_i],
-                                        subsystem_triplet_counts[triplet_i])
-                                 .submatrix(ij_offset, ij_count);
+            info.m_gradients    = B.subview(dof_offset, dof_count);
+            info.m_hessians = HA.subview(subsystem_triplet_offsets[triplet_i],
+                                         subsystem_triplet_counts[triplet_i])
+                                  .submatrix(ij_offset, ij_count);
 
             diag_subsystem->assemble(info);
         }
@@ -363,7 +351,7 @@ void GlobalLinearSystem::Impl::_assemble_linear_system()
                     .submatrix(int2{r_blocked_dof_offset, l_blocked_dof_offset},
                                int2{r_blocked_dof_count, l_blocked_dof_count});
 
-            // spdlog::info("rl_offset: {}, lr_offset: {}", rl_triplet_offset, lr_triplet_offset);
+            // logger::info("rl_offset: {}, lr_offset: {}", rl_triplet_offset, lr_triplet_offset);
 
             off_diag_subsystem->assemble(info);
         }
@@ -394,7 +382,7 @@ void GlobalLinearSystem::Impl::solve_linear_system()
         info.m_b = b.cview();
         info.m_x = x.view();
         iterative_solver->solve(info);
-        spdlog::info("Iterative linear solver iteration count: {}", info.m_iter_count);
+        logger::info("Iterative linear solver iteration count: {}", info.m_iter_count);
     }
 }
 

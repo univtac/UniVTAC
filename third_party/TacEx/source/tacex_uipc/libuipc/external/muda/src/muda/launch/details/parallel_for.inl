@@ -127,7 +127,7 @@ MUDA_HOST MUDA_NODISCARD auto ParallelFor::as_node_parms(int count, F&& f)
 {
     using CallableType = raw_type_t<F>;
 
-    check_input(count);
+    // check_input(count);
 
     auto parms = std::make_shared<NodeParms<F>>(std::forward<F>(f), count);
     if(m_grid_dim <= 0)  // dynamic grid dim

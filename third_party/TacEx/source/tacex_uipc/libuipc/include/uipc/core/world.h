@@ -1,5 +1,5 @@
 #pragma once
-
+#include <uipc/core/sanity_checker.h>
 #include <uipc/core/scene.h>
 #include <uipc/core/feature_collection.h>
 
@@ -36,19 +36,20 @@ class UIPC_CORE_API World final
     void advance();
     void sync();
     void retrieve();
-    void backward();
     bool dump();
     bool recover(SizeT aim_frame = ~0ull);
-    bool write_vertex_pos_to_sim(span<const Vector3> positions, IndexT global_vertex_offset, IndexT local_vertex_offset, SizeT vertex_count, string system_name);
     bool is_valid() const;
 
     SizeT frame() const;
 
     const FeatureCollection& features() const;
+    SanityChecker&           sanity_checker();
+    const SanityChecker&     sanity_checker() const;
 
-  private:
     // Allow create a core::World from a core::internal::World
     World(S<internal::World> w) noexcept;
+
+  private:
     S<internal::World> m_internal;
 };
 }  // namespace uipc::core

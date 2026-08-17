@@ -46,15 +46,14 @@ parser.add_argument(
     type=str,
     default=None,
 )
-
-args_cli = parser.parse_args()
-if args_cli.gpu is not None:
-    os.environ['CUDA_VISIBLE_DEVICES'] = args_cli.gpu
-
 from isaaclab.app import AppLauncher
 AppLauncher.add_app_launcher_args(parser)
 
 # parse the arguments
+args_cli = parser.parse_args()
+if args_cli.gpu is not None:
+    os.environ['CUDA_VISIBLE_DEVICES'] = args_cli.gpu
+
 args_cli.enable_cameras = True
 args_cli.num_envs = 1
 
@@ -181,6 +180,7 @@ def main():
     task_module = importlib.import_module(f"envs.{task_file_name}")
     env_cfg:'BaseTaskCfg' = task_module.TaskCfg()
     env_cfg.tactile_sensor_type = task_config.get('sensor_type', 'gsmini')
+    env_cfg.tactile_optical_backend = task_config.get('optical_backend', 'taxim')
     env_cfg.save_dir = Path(task_config.get("save_dir", "./data")) / task_file_name / task_config_file.stem
     env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)
     env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)

@@ -8,6 +8,8 @@ from tacex_assets.robots.franka.franka_gf225_gripper_uipc import (
     FRANKA_PANDA_ARM_GF225_GRIPPER_HIGH_PD_HIGH_RES_UIPC_CFG
 )
 
+from typing import Literal
+
 from isaaclab.utils import configclass
 from isaaclab.assets import ArticulationCfg
 from ..sensors.tactile import TactileCfg, create_tactile_cfg
@@ -24,7 +26,9 @@ class RobotCfg:
     adaptive_grasp_depth_threshold: float = 27.5 # in mm, used for grasping
     contact_threshold: tuple[float, float] = (27.5, 28.0) # in mm, used in `gravity_rotate` api
 
-def create_franka_gsmini_gripper(data_type:list[str]):
+def create_franka_gsmini_gripper(
+    data_type: list[str], optical_backend: Literal["taxim", "pix2pix"] = "taxim"
+):
     robot = FRANKA_PANDA_ARM_GSMINI_GRIPPER_HIGH_PD_HIGH_RES_UIPC_CFG.replace(
         prim_path="/World/envs/env_.*/Robot",
         init_state=ArticulationCfg.InitialStateCfg(
@@ -48,6 +52,7 @@ def create_franka_gsmini_gripper(data_type:list[str]):
             name="left_tactile",
             sensor_type="gsmini",
             data_type=data_type,
+            optical_backend=optical_backend,
         ),
         create_tactile_cfg(
             prim_path="/World/envs/env_.*/Robot/gelsight_mini_case_right",
@@ -56,6 +61,7 @@ def create_franka_gsmini_gripper(data_type:list[str]):
             name="right_tactile",
             sensor_type="gsmini",
             data_type=data_type,
+            optical_backend=optical_backend,
         )
     ]
     return RobotCfg(

@@ -9,6 +9,7 @@
 #include <uipc/geometry/utils/intersection.h>
 #include <uipc/builtin/attribute_name.h>
 #include <uipc/common/map.h>
+#include <primtive_contact.h>
 
 namespace std
 {
@@ -36,8 +37,8 @@ class SimplicialSurfaceIntersectionCheck final : public SanityChecker
   protected:
     virtual void build(backend::SceneVisitor& scene) override
     {
-        auto enable_contact = scene.info()["contact"]["enable"].get<bool>();
-        if(!enable_contact)
+        auto enable_contact = scene.config().find<IndexT>("contact/enable");
+        if(!enable_contact->view()[0])
         {
             throw SanityCheckerException("Contact is not enabled");
         }
@@ -127,7 +128,8 @@ class SimplicialSurfaceIntersectionCheck final : public SanityChecker
         const geometry::SimplicialComplex& scene_surface =
             context->scene_simplicial_surface();
 
-        const ContactTabular& contact_tabular = context->contact_tabular();
+        auto& contact_tabular  = context->contact_tabular();
+        auto& subscene_tabular = context->subscene_tabular();
 
         auto Vs = scene_surface.vertices().size() ? scene_surface.positions().view() :
                                                     span<const Vector3>{};
@@ -145,6 +147,11 @@ class SimplicialSurfaceIntersectionCheck final : public SanityChecker
         UIPC_ASSERT(attr_cids, "`sanity_check/contact_element_id` is not found in scene surface");
         auto CIds = attr_cids->view();
 
+        auto attr_scids = scene_surface.vertices().find<IndexT>(
+            "sanity_check/subscene_contact_element_id");
+        UIPC_ASSERT(attr_scids, "`sanity_check/subscene_contact_element_id` is not found in scene surface");
+        auto SCIds = attr_scids->view();
+
         auto attr_v_geo_ids =
             scene_surface.vertices().find<IndexT>("sanity_check/geometry_id");
         UIPC_ASSERT(attr_v_geo_ids, "`sanity_check/geometry_id` is not found in scene surface");
@@ -160,6 +167,12 @@ class SimplicialSurfaceIntersectionCheck final : public SanityChecker
             scene_surface.vertices().find<IndexT>("sanity_check/object_id");
         UIPC_ASSERT(attr_v_object_id, "`sanity_check/object_id` is not found in scene surface");
         auto VObjectIds = attr_v_object_id->view();
+
+        auto attr_self_collision =
+            scene_surface.vertices().find<IndexT>("sanity_check/self_collision");
+        UIPC_ASSERT(attr_self_collision,
+                    "`sanity_check/self_collision` is not found in scene surface");
+        auto SelfCollision = attr_self_collision->view();
 
         vector<geometry::BVH::AABB> tri_aabbs(Fs.size());
         for(auto [i, f] : enumerate(Fs))
@@ -179,8 +192,8 @@ class SimplicialSurfaceIntersectionCheck final : public SanityChecker
         vector<IndexT> edge_intersected(Es.size(), 0);
         vector<IndexT> tri_intersected(Fs.size(), 0);
 
-        auto& contact_table = context->contact_tabular();
-        auto  objs          = this->objects();
+        //auto& contact_table = context->contact_tabular();
+        auto objs = this->objects();
 
         bool has_intersection = false;
 
@@ -210,31 +223,46 @@ class SimplicialSurfaceIntersectionCheck final : public SanityChecker
                         return;
                 }
 
-                auto L = CIds[E[0]];
-                auto R = CIds[F[0]];
+                // 2) if this is a self-collision
+                UIPC_ASSERT(VInstanceIds[E[0]] == VInstanceIds[E[1]],
+                            "Why Edge({},{}) is not in the same instance?",
+                            E[0],
+                            E[1]);
+                UIPC_ASSERT(VInstanceIds[F[0]] == VInstanceIds[F[1]]
+                                && VInstanceIds[F[1]] == VInstanceIds[F[2]],
+                            "Why Triangle({},{},{}) is not in the same instance?",
+                            F[0],
+                            F[1],
 
-                const core::ContactModel& model = contact_table.at(L, R);
+                            F[2]);
 
-                // 2) if the contact model is not enabled, don't consider it as an intersection
-                if(!model.is_enabled())
+                if(VInstanceIds[E[0]] == VInstanceIds[F[0]])
+                {
+                    // if self-collision is not enabled, skip it
+                    if(!SelfCollision[E[0]])
+                        return;
+                }
+
+                Vector2i SCidEs = {SCIds[E[0]], SCIds[E[1]]};
+                Vector3i SCidFs = {SCIds[F[0]], SCIds[F[1]], SCIds[F[2]]};
+
+                // 3) if subscene contact is not enabled between two subscene, skip it
+                if(!need_contact(subscene_tabular, SCidEs, SCidFs))
                     return;
 
+
+                Vector2i CidEs = {CIds[E[0]], CIds[E[1]]};
+                Vector3i CidFs = {CIds[F[0]], CIds[F[1]], CIds[F[2]]};
+
+                // 3) if contact is not enabled between two elements, skip it
+                if(!need_contact(contact_tabular, CidEs, CidFs))
+                    return;
 
                 bool intersected = geometry::tri_edge_intersect(
                     Vs[F[0]], Vs[F[1]], Vs[F[2]], Vs[E[0]], Vs[E[1]]);
 
                 if(intersected)
                 {
-                    //spdlog::error(fmt::format("tri_edge_intersect: E[{}] = ({}, {}), F[{}] = ({}, {}, {}) -> intersected = {}",
-                    //                          i,
-                    //                          E[0],
-                    //                          E[1],
-                    //                          j,
-                    //                          F[0],
-                    //                          F[1],
-                    //                          F[2],
-                    //                          intersected));
-
                     edge_intersected[i] = 1;
                     tri_intersected[j]  = 1;
 
@@ -252,6 +280,30 @@ class SimplicialSurfaceIntersectionCheck final : public SanityChecker
 
                     auto ObjIdL = VObjectIds[E[0]];
                     auto ObjIdR = VObjectIds[F[1]];
+
+                    auto InstIdL = VInstanceIds[E[0]];
+                    auto InstIdR = VInstanceIds[F[1]];
+
+                    auto SelfCollL = SelfCollision[InstIdL];
+                    auto SelfCollR = SelfCollision[InstIdR];
+
+                    logger::error(
+                        "Intersection detected between Edge({},{}) in Geometry({}) "
+                        "Instance({}) Object[{}] and Triangle({},{},{}) in "
+                        "Geometry({}) Instance({}) Object[{}], SelfColl({},{})",
+                        E[0],
+                        E[1],
+                        GeoIdL,
+                        InstIdL,
+                        ObjIdL,
+                        F[0],
+                        F[1],
+                        F[2],
+                        GeoIdR,
+                        InstIdR,
+                        ObjIdR,
+                        SelfCollL,
+                        SelfCollR);
 
                     if(GeoIdL > GeoIdR)
                     {
@@ -297,7 +349,8 @@ class SimplicialSurfaceIntersectionCheck final : public SanityChecker
 
             std::string name = "intersected_mesh";
 
-            if(scene.info()["sanity_check"]["mode"] == "normal")
+            auto sanity_check_mode = scene.config().find<std::string>("sanity_check/mode");
+            if(sanity_check_mode->view()[0] == "normal")
             {
                 auto output_path = this_output_path();
                 namespace fs     = std::filesystem;

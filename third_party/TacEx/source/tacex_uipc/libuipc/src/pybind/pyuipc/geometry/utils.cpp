@@ -4,7 +4,6 @@
 #include <Eigen/Geometry>
 #include <uipc/geometry/utils.h>
 
-
 namespace pyuipc::geometry
 {
 using namespace uipc::geometry;
@@ -92,13 +91,6 @@ PyUtils::PyUtils(py::module& m)
         py::arg("sc"));
 
     m.def(
-        "tetrahedralize",
-        [](const SimplicialComplex& simplicial_complex, const Json& options) -> SimplicialComplex
-        { return tetrahedralize(simplicial_complex, options); },
-        py::arg("simplicial_complex"),
-        py::arg("options") = Json::object());
-
-    m.def(
         "optimal_transform",
         [](py::array_t<const Float> S, py::array_t<const Float> D)
         {
@@ -117,5 +109,11 @@ PyUtils::PyUtils(py::module& m)
         py::arg("dst"));
 
     m.def("is_trimesh_closed", &is_trimesh_closed, py::arg("sc"));
+
+    m.def("constitution_type", &constitution_type, py::arg("geo"));
+
+    m.def("compute_mesh_d_hat", &compute_mesh_d_hat, py::arg("sc"), py::arg("max_d_hat"));
+
+    m.def("points_from_volume", &points_from_volume, py::arg("sc"), py::arg("resolution") = 0.01);
 }
 }  // namespace pyuipc::geometry

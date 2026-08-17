@@ -24,7 +24,7 @@ class GF225Cfg(GelSightSensorCfg):
     )
 
     sensor_camera_cfg: GelSightSensorCfg.SensorCameraCfg = GelSightSensorCfg.SensorCameraCfg(
-        prim_path_appendix="/Camera",
+        prim_name="Camera",
         update_period=0,
         resolution=(480, 480),
         data_types=["depth"],

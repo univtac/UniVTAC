@@ -72,4 +72,4 @@ class FOTSMarkerSimulatorCfg(GelSightSimulatorCfg):
     # camera height map.
     # """
 
-    frame_transformer_cfg: FrameTransformerCfg = MISSING
+    frame_transformer_cfg: FrameTransformerCfg | None = None

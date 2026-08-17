@@ -124,6 +124,10 @@ class UipcRLEnv(DirectRLEnv):
             if "prestartup" in self.event_manager.available_modes:
                 self.event_manager.apply(mode="prestartup")
 
+        # setup the uipc_sim before the objects in the Isaac simulation are initialized
+        if self.uipc_sim is not None:
+            self.uipc_sim.setup_sim()
+
         # play the simulator to activate physics handles
         # note: this activates the physics simulation view that exposes TensorAPIs
         # note: when started in extension mode, first call sim.reset_async() and then initialize the managers
@@ -135,9 +139,6 @@ class UipcRLEnv(DirectRLEnv):
                 # this is needed for the observation manager to get valid tensors for initialization.
                 # this shouldn't cause an issue since later on, users do a reset over all the environments so the lazy buffers would be reset.
                 self.scene.update(dt=self.physics_dt)
-
-        if self.uipc_sim is not None:
-            self.uipc_sim.setup_sim()
 
         # check if debug visualization is has been implemented by the environment
         source_code = inspect.getsource(self._set_debug_vis_impl)
@@ -336,7 +337,7 @@ class UipcRLEnv(DirectRLEnv):
             # note: we assume the render interval to be the shortest accepted rendering interval.
             #    If a camera needs rendering at a faster frequency, this will lead to unexpected behavior.
             if self._sim_step_counter % self.cfg.sim.render_interval == 0 and is_rendering:
-                if self.uipc_sim is not None:
+                if self.uipc_sim is not None and self.cfg.uipc_sim.update_render_meshes:
                     self.uipc_sim.update_render_meshes()
                 self.sim.render()
 
@@ -361,7 +362,7 @@ class UipcRLEnv(DirectRLEnv):
             self.sim.forward()
             # if sensors are added to the scene, make sure we render to reflect changes in reset
             if self.sim.has_rtx_sensors() and self.cfg.rerender_on_reset:
-                if self.uipc_sim is not None:
+                if self.uipc_sim is not None and self.cfg.uipc_sim.update_render_meshes:
                     self.uipc_sim.update_render_meshes()
                 self.sim.render()
 
@@ -426,7 +427,7 @@ class UipcRLEnv(DirectRLEnv):
         # run a rendering step of the simulator
         # if we have rtx sensors, we do not need to render again sin
         if not self.sim.has_rtx_sensors() and not recompute:
-            if self.uipc_sim is not None:
+            if self.uipc_sim is not None and self.cfg.uipc_sim.update_render_meshes:
                 self.uipc_sim.update_render_meshes()
             self.sim.render()
         # decide the rendering mode

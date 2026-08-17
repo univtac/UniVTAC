@@ -77,7 +77,7 @@ class FieldEntry : public FieldEntryBase
     static_assert(M > 0 && N > 0, "M and N must be positive");
 
   public:
-    using ElementType = typename FieldEntryView<T, Layout, M, N>::ElementType;
+    using ValueT = typename FieldEntryView<T, Layout, M, N>::ValueT;
 
     FieldEntry(SubField& field, FieldEntryLayoutInfo layout, FieldEntryType type, std::string_view name)
         : FieldEntryBase{field,
@@ -122,11 +122,11 @@ class FieldEntry : public FieldEntryBase
         return view().viewer();
     }
 
-    void copy_to(DeviceBuffer<ElementType>& dst) const;
-    void copy_to(std::vector<ElementType>& dst) const;
+    void copy_to(DeviceBuffer<ValueT>& dst) const;
+    void copy_to(std::vector<ValueT>& dst) const;
 
-    void copy_from(const DeviceBuffer<ElementType>& src);
-    void copy_from(const std::vector<ElementType>& src);
+    void copy_from(const DeviceBuffer<ValueT>& src);
+    void copy_from(const std::vector<ValueT>& src);
 
     template <FieldEntryLayout SrcLayout>
     void copy_from(const FieldEntry<T, SrcLayout, M, N>& src);
@@ -160,10 +160,10 @@ class FieldEntry : public FieldEntryBase
         }
     }
 
-    void fill(const ElementType& value);
+    void fill(const ValueT& value);
 
   private:
-    mutable DeviceBuffer<ElementType> m_workpace;  // for data copy, if needed
+    mutable DeviceBuffer<ValueT> m_workpace;  // for data copy, if needed
 };
 }  // namespace muda
 

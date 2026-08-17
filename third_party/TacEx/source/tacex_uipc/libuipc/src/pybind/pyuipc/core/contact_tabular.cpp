@@ -64,6 +64,11 @@ PyContactTabular::PyContactTabular(py::module& m)
                                          [](ContactModelCollection& self,
                                             std::string_view name) -> S<uipc::geometry::IAttributeSlot>
                                          { return self.find(name); });
+
+        class_ContactModelCollection.def(
+            "__repr__",
+            [](const ContactModelCollection& self) -> std::string
+            { return fmt::format("{}", self.to_json().dump(4)); });
     }
 
     {
@@ -88,7 +93,6 @@ PyContactTabular::PyContactTabular(py::module& m)
                                  py::arg("enable") = true,
                                  py::arg("config") = Json::object());
 
-
         class_ContactTabular.def(
             "default_model",
             [](ContactTabular& self, Float friction_rate, Float resistance, bool enable, const Json& config)
@@ -98,17 +102,23 @@ PyContactTabular::PyContactTabular(py::module& m)
             py::arg("enable") = true,
             py::arg("config") = Json::object());
 
-        class_ContactTabular.def("default_model",
-                                 [](ContactTabular& self) -> ContactModel
-                                 { return self.default_model(); });
+        class_ContactTabular.def(
+            "default_model",
+            [](ContactTabular& self) -> ContactModel
+            { return self.default_model(); },
+            py::return_value_policy::move);
 
-        class_ContactTabular.def("at",
-                                 [](ContactTabular& self, IndexT i, IndexT j) -> ContactModel
-                                 { return self.at(i, j); });
+        class_ContactTabular.def(
+            "at",
+            [](ContactTabular& self, IndexT i, IndexT j) -> ContactModel
+            { return self.at(i, j); },
+            py::return_value_policy::move);
 
-        class_ContactTabular.def("contact_models",
-                                 [](ContactTabular& self) -> ContactModelCollection
-                                 { return self.contact_models(); });
+        class_ContactTabular.def(
+            "contact_models",
+            [](ContactTabular& self) -> ContactModelCollection
+            { return self.contact_models(); },
+            py::return_value_policy::move);
     }
 }
 }  // namespace pyuipc::core

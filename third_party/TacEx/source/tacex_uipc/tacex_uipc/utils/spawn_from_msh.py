@@ -155,7 +155,7 @@ def create_prim_for_tet_data(prim_path, tet_points_world, tet_indices):
     tet_surf_tri = surf.triangles().topo().view().reshape(-1).tolist()
     tet_surf_points_world = surf.positions().view().reshape(-1, 3)
 
-    MeshGenerator.update_usd_mesh(prim=prim, surf_points=tet_surf_points_world, triangles=tet_surf_tri)
+    MeshGenerator.update_usd_mesh(gprim=prim, surf_points=tet_surf_points_world, triangles=tet_surf_tri)
 
 
 def create_prim_for_uipc_scene_object(uipc_sim, prim_path, uipc_scene_object):
@@ -172,7 +172,7 @@ def create_prim_for_uipc_scene_object(uipc_sim, prim_path, uipc_scene_object):
     tet_surf_tri = surf.triangles().topo().view().reshape(-1).tolist()
     tet_surf_points_world = surf.positions().view().reshape(-1, 3)
 
-    MeshGenerator.update_usd_mesh(prim=prim, surf_points=tet_surf_points_world, triangles=tet_surf_tri)
+    MeshGenerator.update_usd_mesh(gprim=prim, surf_points=tet_surf_points_world, triangles=tet_surf_tri)
 
     # setup mesh updates via Fabric
     fabric_stage = usdrt.Usd.Stage.Attach(omni.usd.get_context().get_stage_id())

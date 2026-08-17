@@ -58,7 +58,7 @@ class Dense1DT : public ViewerBase<IsConst>
         : m_data(other.data())
         , m_dim(other.dim())
     {
-        static_assert(OtherIsConst, "Only non-const viewer can be convert to const viewer");
+        static_assert(!OtherIsConst, "Only non-const viewer can be convert to const viewer"); // TODO: failed at CUDA 13
     }
 
     MUDA_GENERIC auto as_const() const MUDA_NOEXCEPT

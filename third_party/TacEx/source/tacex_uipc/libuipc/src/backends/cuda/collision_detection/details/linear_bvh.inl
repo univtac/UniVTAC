@@ -7,7 +7,6 @@
 #include <cuda/atomic>
 #include <muda/atomic.h>
 #include <muda/ext/eigen/atomic.h>
-#include <thrust/detail/minmax.h>
 
 #include <uipc/common/log.h>
 
@@ -186,7 +185,7 @@ MUDA_INLINE MUDA_GENERIC std::uint32_t expand_bits(std::uint32_t v) noexcept
     return v;
 }
 
-MUDA_INLINE MUDA_GENERIC std::uint32_t morton_code(Vector3 xyz) noexcept
+MUDA_INLINE MUDA_GENERIC std::uint32_t morton_code(Eigen::Vector3f xyz) noexcept
 {
     xyz = xyz.cwiseMin(1.0).cwiseMax(0.0);
     const std::uint32_t xx = expand_bits(static_cast<std::uint32_t>(xyz.x() * 1024.0));
@@ -212,7 +211,7 @@ MUDA_INLINE MUDA_DEVICE uint2 determine_range(muda::Dense1D<LinearBVHMortonIndex
 
     // Compute upper bound for the length of the range
 
-    const int delta_min = thrust::min(L_delta, R_delta);
+    const int delta_min = (L_delta < R_delta) ? L_delta : R_delta;
     int       l_max     = 2;
     int       delta     = -1;
     int       i_tmp     = idx + d * l_max;
@@ -251,7 +250,10 @@ MUDA_INLINE MUDA_DEVICE uint2 determine_range(muda::Dense1D<LinearBVHMortonIndex
     uint32_t jdx = idx + l * d;
     if(d < 0)
     {
-        thrust::swap(idx, jdx);  // make it sure that idx < jdx
+        // make it sure that idx < jdx
+        auto tmp = idx;
+        idx      = jdx;
+        jdx      = tmp;
     }
     return make_uint2(idx, jdx);
 }
@@ -343,15 +345,15 @@ MUDA_INLINE void build_internal_aabbs(size_t num_objects,
                        // to avoid cache coherency problem, we must use atomic operation.
                        auto atomic_fetch = [](LinearBVHAABB& aabb) -> LinearBVHAABB
                        {
-                           Vector3       zero  = Vector3::Zero();
-                           LinearBVHAABB aabb_ = aabb;
+                           Eigen::Vector3f zero  = Eigen::Vector3f::Zero();
+                           LinearBVHAABB   aabb_ = aabb;
 
                            // without atomic_thread_fence, this loop may be infinite.
                            while(aabb_.isEmpty())
                            {
-                               Vector3 min_ = eigen::atomic_add(aabb.min(), zero);
-                               Vector3 max_ = eigen::atomic_add(aabb.max(), zero);
-                               aabb_ = LinearBVHAABB{min_, max_};
+                               auto min_ = eigen::atomic_add(aabb.min(), zero);
+                               auto max_ = eigen::atomic_add(aabb.max(), zero);
+                               aabb_     = LinearBVHAABB{min_, max_};
                            };
 
                            return aabb_;
@@ -390,7 +392,6 @@ MUDA_INLINE void LinearBVH::build(muda::CBufferView<LinearBVHAABB> aabbs, muda::
     BufferLaunch(s).fill(m_aabbs.view(), default_aabb);
 
     resize(s, m_sorted_mortons, num_objects);
-    resize(s, m_sorted_mortons, num_objects);
 
     resize(s, m_indices, num_objects);
     resize(s, m_new_to_old, num_objects);
@@ -420,8 +421,8 @@ MUDA_INLINE void LinearBVH::build(muda::CBufferView<LinearBVHAABB> aabbs, muda::
                 aabbs    = aabbs.viewer().name("filled_aabbs"),
                 mortons = m_mortons.viewer().name("mortons")] __device__(int i) mutable
                {
-                   auto&   aabb = aabbs(i);
-                   Vector3 p    = aabb.center();
+                   auto&           aabb = aabbs(i);
+                   Eigen::Vector3f p    = aabb.center();
 
                    MUDA_ASSERT(aabbs(i).volume() >= 0,
                                "Invalid AABB(%d), Max(%f,%f,%f) < Min(%f,%f,%f)",
@@ -463,7 +464,8 @@ MUDA_INLINE void LinearBVH::build(muda::CBufferView<LinearBVHAABB> aabbs, muda::
                 mortons   = m_sorted_mortons.viewer().name("mortons"),
                 indices = m_new_to_old.viewer().name("indices")] __device__(int i) mutable
                {
-                   MortonIndex morton{mortons(i), indices(i)};
+                   uint32_t    idx = i;
+                   MortonIndex morton{mortons(i), idx};
                    morton64s(i) = morton;
                });
 
@@ -505,11 +507,11 @@ MUDA_INLINE void LinearBVH::build(muda::CBufferView<LinearBVHAABB> aabbs, muda::
 
                    nodes(idx).left_idx  = gamma;
                    nodes(idx).right_idx = gamma + 1;
-                   if(thrust::min(ij.x, ij.y) == gamma)
+                   if(((ij.x < ij.y) ? ij.x : ij.y) == gamma)
                    {
                        nodes(idx).left_idx += num_objects - 1;
                    }
-                   if(thrust::max(ij.x, ij.y) == gamma + 1)
+                   if(((ij.x > ij.y) ? ij.x : ij.y) == gamma + 1)
                    {
                        nodes(idx).right_idx += num_objects - 1;
                    }

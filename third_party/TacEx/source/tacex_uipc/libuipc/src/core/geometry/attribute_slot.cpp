@@ -1,5 +1,6 @@
 #include <uipc/geometry/attribute_collection.h>
 #include <uipc/common/log.h>
+#include <uipc/geometry/attribute_debug_info.h>
 
 namespace uipc::geometry
 {
@@ -34,6 +35,17 @@ Json IAttributeSlot::to_json() const
     j["name"]      = name();
     j["attribute"] = attribute().to_json();
     return j;
+}
+
+Json IAttributeSlot::to_json(SizeT i) const
+{
+    return attribute().to_json(i);
+}
+
+void IAttributeSlot::from_json_array(const Json& j) noexcept
+{
+    rw_access();
+    attribute().from_json_array(j);
 }
 
 bool IAttributeSlot::is_evolving() const noexcept
@@ -90,6 +102,14 @@ void IAttributeSlot::rw_access()
 {
     last_modified(std::chrono::high_resolution_clock::now());
     make_owned();
+}
+
+void check_view(const IAttributeSlot* slot)
+{
+    UIPC_ASSERT(slot,
+                "You are trying to access a nullptr attribute slot, please check if the attribute name is correct.\n"
+                "The last attribute name (thread local) you tried to find is: {}",
+                AttributeDebugInfo::thread_local_last_not_found_name());
 }
 
 void IAttributeSlot::last_modified(const TimePoint& tp)

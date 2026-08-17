@@ -82,8 +82,6 @@ class COOVectorViewBase : public ViewBase<IsConst>
                          m_descr};
     }
 
-    MUDA_GENERIC operator ConstView() const { return as_const(); }
-
     // non-const accessor
 
     MUDA_GENERIC auto viewer()

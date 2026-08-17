@@ -1,0 +1,15 @@
+{
+    "pix2pix_model": {
+        "input_nc": 1,
+        "output_nc": 3,
+        "ngf": 64,
+        "netG": "resnet_9blocks",
+        "norm": "batch",
+        "use_dropout": true,
+        "crop_size": 120,
+        "load_size": 120
+    },
+    "img_width": 320,
+    "img_height": 240,
+    "checkpoint": "resnet9_net_G.pth"
+}

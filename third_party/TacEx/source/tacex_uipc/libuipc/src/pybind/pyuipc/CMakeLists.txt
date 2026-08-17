@@ -6,7 +6,9 @@ target_link_libraries(pyuipc PUBLIC uipc::uipc)
 # ensure all backends are built before pyuipc
 add_dependencies(pyuipc uipc::backends)
 target_include_directories(pyuipc PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../")
+target_compile_definitions(pyuipc PRIVATE "PYBIND11_DETAILED_ERROR_MESSAGES")
 uipc_target_set_output_directory(pyuipc)
+uipc_target_set_rpath(pyuipc)
 
 file(GLOB SOURCES "*.cpp" "*.h")
 target_sources(pyuipc PRIVATE ${SOURCES})
@@ -18,6 +20,11 @@ add_subdirectory(constitution)
 add_subdirectory(backend)
 add_subdirectory(builtin)
 add_subdirectory(diff_sim)
+
+if (UIPC_WITH_USD_SUPPORT)
+    target_compile_definitions(pyuipc PRIVATE "UIPC_WITH_USD_SUPPORT=1")
+    add_subdirectory(usd)
+endif()
 
 # Setup IDE
 get_target_property(SOURCES pyuipc SOURCES)

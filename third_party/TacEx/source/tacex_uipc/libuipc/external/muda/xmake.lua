@@ -56,6 +56,7 @@ if has_config("example") then
     target("muda_example")
         muda_app_base("cui")
         add_files("example/**.cu","example/**.cpp")
+        add_includedirs("example")
     target_end()
 end
 

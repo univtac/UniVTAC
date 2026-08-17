@@ -1,164 +1,79 @@
-# Installation Guide
+# Installation (Isaac Sim 5.1)
 
-## Installation all-in-one Script
+The `isaac51` branch targets this fixed stack:
 
-Clone the repository and run the installation script `scripts/install.sh` to set up the environment and install dependencies all at once. The script will create a conda environment named `UniVTAC` and install Isaac Sim, Isaac Lab, TacEx, cuRobo, and other necessary packages.
+- Linux with an NVIDIA RTX GPU and a driver compatible with CUDA 12.6
+- Python 3.11 in the project-local `.venv`
+- Isaac Sim 5.1.0 and Isaac Lab 2.3.0
+- PyTorch 2.7 / CUDA 12.6
+- the modified TacEx and libuipc sources vendored in this repository
 
-```bash
-git clone https://github.com/univtac/UniVTAC.git
-cd UniVTAC
-bash scripts/install.sh
-```
+Do not install public TacEx over this environment. UniVTAC depends on its
+local camera, UIPC, actor and optical-backend changes.
 
-## Manual Installation Instructions
+## Automated installation
 
-### Requirements
-
-- System: Linux with NVIDIA GPU
-- Python 3.10
-- NVIDIA Isaac Sim 4.5 + Isaac Lab 2.1.1
-- [NVIDIA cuRobo](https://curobo.org)
-- [TacEx](https://github.com/DH-Ng/TacEx): **Must be built from the local `third_party/TacEx` source** (contains project-specific modifications)
-
-### Installation & Setup
-
-#### Step 1: Clone the Repository
+Install `uv`, CMake, Git and GCC/G++ 12, then run:
 
 ```bash
 git clone https://github.com/univtac/UniVTAC.git
 cd UniVTAC
+git checkout isaac51
+./scripts/install.sh
 ```
 
-#### Step 2: Create a Conda Environment
+The script creates `.venv`, installs Isaac Sim/Lab and the local TacEx
+packages, builds the vendored libuipc Python binding, and installs cuRobo at the
+revision used for this migration. It does not alter shell startup files or a
+Conda environment.
+
+The default CUDA toolkit path is `/usr/local/cuda-12.6` and the default GPU
+architecture is SM 8.9. Override build detection when needed:
 
 ```bash
-conda create -n UniVTAC python=3.10 -y
-conda activate UniVTAC
+UNIVTAC_CUDA_HOME=/path/to/cuda-12.6 \
+UNIVTAC_CUDA_ARCH=89 \
+UNIVTAC_CC=/path/to/gcc-12 \
+UNIVTAC_CXX=/path/to/g++-12 \
+UNIVTAC_BUILD_JOBS=8 \
+./scripts/install.sh
 ```
 
-#### Step 3: Install cuRobo
+If vcpkg already exists, set `UNIVTAC_VCPKG_ROOT`. Otherwise it is cloned
+under the ignored project-local `.cache/toolchains` directory.
 
-cuRobo is used for GPU-accelerated collision-aware motion planning. Follow the official [cuRobo Installation Guide](https://curobo.org/get_started/1_install_instructions.html).
+## Verification
 
-#### Step 4: Install TacEx (Modified Source)
+On the first Isaac Sim launch, review and accept the NVIDIA Omniverse EULA at
+the prompt. For an already-approved non-interactive machine, NVIDIA also
+supports setting `OMNI_KIT_ACCEPT_EULA=YES` for the launch command.
 
-> **Important:** Do **not** install TacEx from the public repository. UniVTAC requires a modified version of TacEx that is bundled in `third_party/TacEx`. Some internal APIs have been adapted for UniVTAC's tactile sensor pipeline.
-
-``` bash
-cd third_party/TacEx
-```
-
-If you have a working Isaac Lab environment, you can directly install TacEx. Otherwise, **you need to install Isaac Sim 4.5 and Isaac Lab 2.1.1**. Below is a quick summary, but here is the [full installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html).
-
-<details>
-<summary>Quick summary for Installing Isaac Sim and Isaac Lab for Ubuntu 22.04</summary>
-
-> [!note]
-> To install Isaac Sim for Ubuntu 20.04 follow the [binary installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/binaries_installation.html).
-
-##### Isaac Sim - Linux pip installation
+Run one headless Taxim episode with one Franka and two GelSight Mini sensors:
 
 ```bash
-# install cuda-enabled pytorch
-pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu118
-pip install --upgrade pip
-# install isaac sim packages
-pip install 'isaacsim[all,extscache]==4.5.0' --extra-index-url https://pypi.nvidia.com
+.venv/bin/python scripts/collect_data.py \
+  grasp_classify demo --episode_num 1 --max_seed 0 --headless
 ```
 
-> verify that the Isaac Sim installation works by calling `isaacsim` in the terminal
+The optical backend is selected before the environment starts in the task
+YAML:
 
-###### Isaac Lab
-
-```bash
-# install dependencies via apt (Ubuntu)
-sudo apt install cmake build-essential
-git clone https://github.com/isaac-sim/IsaacLab
-cd IsaacLab
-# use Isaac Lab version 2.1.1
-git checkout v2.1.1
-# activate the Isaac Sim python env
-conda activate UniVTAC
-# install isaaclab extensions (with --editable flag)
-./isaaclab.sh --install # or "./isaaclab.sh -i"
+```yaml
+sensor_type: gsmini
+optical_backend: taxim  # or pix2pix
 ```
 
-To verify the Isaac Lab Installation:
+See [Isaac Sim 5.1 migration notes](./isaacsim_5_1_migration.md) for the
+camera ownership, output contract, actor pose semantics and render pipeline.
 
-```bash
-conda activate UniVTAC
-python scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ant-v0 --headless
-```
+## Build troubleshooting
 
-</details>
-
-##### Installing TacEx [Core]
-
-**1.** Activate the Isaac Env
-```bash
-conda activate UniVTAC
-```
-
-**2.** Install the core packages of TacEx
-```bash
-# Script will pip install core TacEx packages with --editable flag)
-./tacex.sh -i
-```
-
-> You can install the extensions one by one via e.g. `python -m pip install -e source/tacex_uipc`
-
-**3.** Verify that TacEx works by running an example:
-
-```bash
-python ./scripts/demos/tactile_sim_approaches/check_taxim_sim.py --debug_vis
-```
-
-And here is an RL example:
-```bash
-python ./scripts/reinforcement_learning/skrl/train.py --task TacEx-Ball-Rolling-Tactile-RGB-v0 --num_envs 512 --enable_cameras
-```
-> You can view the sensor output in the IsaacLab Tab: `Scene Debug Visualization > Observations > sensor_output`
-
-##### Installing TacEx [UIPC]
-The `tacex_uipc` package is responsible for the [UIPC](https://spirimirror.github.io/libuipc-doc/) simulation in TacEx.
-
-**1.** Install the [libuipc dependencies](https://spirimirror.github.io/libuipc-doc/build_install/linux/):
-* If not installed yet, install Vcpkg
-
-```bash
-mkdir ~/Toolchain
-cd ~/Toolchain
-git clone https://github.com/microsoft/vcpkg.git
-cd vcpkg
-./bootstrap-vcpkg.sh -disableMetrics
-```
-
-* Set the System Environment Variable  `CMAKE_TOOLCHAIN_FILE` to let CMake detect Vcpkg. If you installed it like above, you can do this:
-
-```bash
-# Write in ~/.bashrc
-export CMAKE_TOOLCHAIN_FILE="$HOME/Toolchain/vcpkg/scripts/buildsystems/vcpkg.cmake"
-```
-
-* We also need `CMake 3.26`, `GCC 11.4` and `Cuda 12.4` to build libuipc. Install this into the Isaac Sim python env:
-
-```bash
-# Inside the root dir of TacEx repo
-conda activate UniVTAC
-conda env update -n UniVTAC --file ./source/tacex_uipc/libuipc/conda/env.yaml
-```
-> If Cuda 12.4 does not work for, try updating your Nvidia drivers or try to use an older Cuda version by adjusting the env.yaml file (e.g. Cuda 12.2).
-
-**2.** Install `tacex_uipc`
-```bash
-# This also builds `libuipc` and pip installs the python bindings.
-conda activate UniVTAC
-pip install -e source/tacex_uipc -v
-```
-> You can also install all TacEx packages with `./tacex.sh -i all`.
-
-**3.** Verify that the `tacex_uipc` works by running a data collection example:
-
-```bash
-bash collect_data.sh grasp_classify demo 0
-```
+- Keep both `CUDA_HOME` and `CUDA_PATH` on CUDA 12.6. A stale `CUDA_PATH`
+  pointing at CUDA 13 can make CMake select incompatible headers.
+- libuipc is memory intensive. Reduce `UNIVTAC_BUILD_JOBS` to 4 if the build
+  swaps heavily or is killed by the OOM killer.
+- The included `scripts/toolchains/gcc12-system-ld` wrappers address Conda GCC
+  12 installations whose bundled old linker cannot read the host glibc RELR
+  sections. A normal system GCC/G++ 12 installation does not need them.
+- Phase one supports `num_envs=1`; multi-environment UIPC state distribution is
+  deliberately left for the next phase.

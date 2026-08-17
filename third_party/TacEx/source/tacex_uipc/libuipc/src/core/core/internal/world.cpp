@@ -8,34 +8,53 @@
 #include <uipc/backend/module_init_info.h>
 #include <uipc/core/internal/scene.h>
 
-#include <iostream>
 
 namespace uipc::core::internal
 {
+static S<internal::Engine> lock(const W<internal::Engine>& e)
+{
+    UIPC_ASSERT(!e.expired(), "Engine is expired, did you throw the `Engine`?");
+    return e.lock();
+}
+
 World::World(internal::Engine& e) noexcept
-    : m_engine(&e)
+    : m_engine(e.weak_from_this())
 {
 }
 
 void World::init(internal::Scene& s)
 {
+    // 1. Record Scene Pointer
     if(m_scene)
         return;
+    m_scene = s.shared_from_this();
 
-    sanity_check(s);
+    auto engine = lock(m_engine);
 
+    // 2. Sanity Check Before Init
+    // initialize sanity checker
+    m_sanity_checker = uipc::make_shared<SanityChecker>(s, engine->workspace());
+    auto& config     = m_scene->config();
+    auto  sanity_check_enable_attr = config.find<IndexT>("sanity_check/enable");
+    if(sanity_check_enable_attr->view()[0])
+    {
+        _sanity_check();
+    }
     if(!m_valid)
     {
-        spdlog::error("World is not valid, skipping init.");
+        logger::error("World is not valid, skipping init.");
         return;
     }
-    m_scene = &s;
-    m_scene->init(*this);
-    m_engine->init(*this);
 
-    if(m_engine->status().has_error())
+    // 3. Init Scene
+    m_scene->init(*this);
+
+    // 4. Init Engine
+    engine->init(*this);
+
+    if(engine->status().has_error())
     {
-        spdlog::error("Engine has error after init, world becomes invalid.");
+        logger::error("Engine has error after init, world becomes invalid.");
         m_valid = false;
     }
 }
@@ -44,15 +63,17 @@ void World::advance()
 {
     if(!m_valid)
     {
-        spdlog::error("World is not valid, skipping advance.");
+        logger::error("World is not valid, skipping advance.");
         return;
     }
 
-    m_engine->advance();
+    auto engine = lock(m_engine);
 
-    if(m_engine->status().has_error())
+    engine->advance();
+
+    if(engine->status().has_error())
     {
-        spdlog::error("Engine has error after advance, world becomes invalid.");
+        logger::error("Engine has error after advance, world becomes invalid.");
         m_valid = false;
     }
 }
@@ -61,15 +82,17 @@ void World::sync()
 {
     if(!m_valid)
     {
-        spdlog::error("World is not valid, skipping sync.");
+        logger::error("World is not valid, skipping sync.");
         return;
     }
 
-    m_engine->sync();
+    auto engine = lock(m_engine);
 
-    if(m_engine->status().has_error())
+    engine->sync();
+
+    if(engine->status().has_error())
     {
-        spdlog::error("Engine has error after sync, world becomes invalid.");
+        logger::error("Engine has error after sync, world becomes invalid.");
         m_valid = false;
     }
 }
@@ -78,38 +101,17 @@ void World::retrieve()
 {
     if(!m_valid)
     {
-        spdlog::error("World is not valid, skipping retrieve.");
-        return;
-    }
-    m_engine->retrieve();
-
-    if(m_engine->status().has_error())
-    {
-        spdlog::error("Engine has error after retrieve, world becomes invalid.");
-        m_valid = false;
-    }
-}
-
-void World::backward()
-{
-    if(!m_valid)
-    {
-        spdlog::error("World is not valid, skipping backward.");
-        return;
-    }
-    if(m_scene->diff_sim().parameters().size())
-    {
-        m_engine->backward();
-    }
-    else
-    {
-        spdlog::warn("No parameters to backward, skipping backward.");
+        logger::error("World is not valid, skipping retrieve.");
         return;
     }
 
-    if(m_engine->status().has_error())
+    auto engine = lock(m_engine);
+
+    engine->retrieve();
+
+    if(engine->status().has_error())
     {
-        spdlog::error("Engine has error after backward, world becomes invalid.");
+        logger::error("Engine has error after retrieve, world becomes invalid.");
         m_valid = false;
     }
 }
@@ -118,15 +120,17 @@ bool World::dump()
 {
     if(!m_valid)
     {
-        spdlog::error("World is not valid, skipping dump.");
+        logger::error("World is not valid, skipping dump.");
         return false;
     }
 
-    bool success   = m_engine->dump();
-    bool has_error = m_engine->status().has_error();
+    auto engine = lock(m_engine);
+
+    bool success   = engine->dump();
+    bool has_error = engine->status().has_error();
     if(has_error)
     {
-        spdlog::error("Engine has error after dump, world becomes invalid.");
+        logger::error("Engine has error after dump, world becomes invalid.");
         m_valid = false;
     }
 
@@ -137,22 +141,24 @@ bool World::recover(SizeT aim_frame)
 {
     if(!m_scene)
     {
-        spdlog::warn("Scene has not been set, skipping recover. Hint: you may call World::init() first.");
+        logger::warn("Scene has not been set, skipping recover. Hint: you may call World::init() first.");
         return false;
     }
 
     if(!m_valid)
     {
-        spdlog::error("World is not valid, skipping recover.");
+        logger::error("World is not valid, skipping recover.");
         return false;
     }
 
-    bool success   = m_engine->recover(aim_frame);
-    bool has_error = m_engine->status().has_error();
+    auto engine = lock(m_engine);
+
+    bool success   = engine->recover(aim_frame);
+    bool has_error = engine->status().has_error();
 
     if(has_error)
     {
-        spdlog::error("Engine has error after recover, world becomes invalid.");
+        logger::error("Engine has error after recover, world becomes invalid.");
         m_valid = false;
     }
 
@@ -167,27 +173,6 @@ bool World::recover(SizeT aim_frame)
     return success && !has_error;
 }
 
-bool World::write_vertex_pos_to_sim(span<const Vector3> positions, IndexT global_vertex_offset, IndexT local_vertex_offset, SizeT vertex_count, string system_name)
-{   
-    std::cout << "write_vertex_pos in world: test " << "\n";
-    
-    if(!m_valid)
-    {
-        spdlog::error("World is not valid, skipping writing_vertex_pos_to_sim.");
-        return false;
-    }
-
-    bool success   = m_engine->write_vertex_pos_to_sim(positions, global_vertex_offset, local_vertex_offset, vertex_count, system_name);
-    bool has_error = m_engine->status().has_error();
-    if(has_error)
-    {
-        spdlog::error("Engine has error after dump, world becomes invalid.");
-        m_valid = false;
-    }
-
-    return success && !has_error;
-}
-
 bool World::is_valid() const
 {
     return m_valid;
@@ -195,32 +180,41 @@ bool World::is_valid() const
 
 SizeT World::frame() const
 {
+    auto engine = lock(m_engine);
+
     if(!m_valid)
     {
-        spdlog::error("World is not valid, frame set to 0.");
+        logger::error("World is not valid, frame set to 0.");
         return 0;
     }
-    return m_engine->frame();
+    return engine->frame();
 }
 
 const FeatureCollection& World::features() const
 {
-    return m_engine->features();
+    auto engine = lock(m_engine);
+    return engine->features();
 }
 
-void World::sanity_check(Scene& s)
+SanityChecker& World::sanity_checker()
 {
-    auto& config = s.config();
-    if(config["sanity_check"]["enable"].get<bool>() == true)
-    {
-        auto result = s.sanity_checker().check(m_engine->workspace());
+    UIPC_ASSERT(m_sanity_checker, "SanityChecker is not initialized. You should call World::init() first.");
+    return *m_sanity_checker;
+}
 
-        if(result != SanityCheckResult::Success)
-        {
-            s.sanity_checker().report();
-        }
+const SanityChecker& World::sanity_checker() const
+{
+    UIPC_ASSERT(m_sanity_checker, "SanityChecker is not initialized. You should call World::init() first.");
+    return *m_sanity_checker;
+}
 
-        m_valid = (result == SanityCheckResult::Success);
-    }
+void World::_sanity_check()
+{
+    auto  engine         = lock(m_engine);
+    auto& sanity_checker = *m_sanity_checker;
+    auto  result         = sanity_checker.check();
+    if(result != SanityCheckResult::Success)
+        sanity_checker.report();
+    m_valid = (result == SanityCheckResult::Success);
 }
 }  // namespace uipc::core::internal

@@ -78,7 +78,6 @@ void field_test2(FieldEntryLayout layout)
 {
     Field field;
     auto& particle = field["particle"];
-    float dt       = 0.01f;
 
     // build the field
     auto builder = particle.AoSoA();
@@ -228,6 +227,8 @@ void field_example(FieldEntryLayout layout)
     // copy between buffer and entry
     DeviceBuffer<Vector3f> pos_buf;
     pos.copy_to(pos_buf);
+    FieldEntryLaunch().copy(pos_buf.view(), std::as_const(pos).view());
+
     pos.copy_from(pos_buf);
 
     // using cub to do reduction on any format

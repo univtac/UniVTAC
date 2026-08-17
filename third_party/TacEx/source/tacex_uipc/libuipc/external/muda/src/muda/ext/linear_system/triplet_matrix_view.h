@@ -252,6 +252,26 @@ class TripletMatrixViewT : public ViewBase<IsConst>
     {
         return m_total_triplet_count;
     }
+
+    MUDA_GENERIC auto row_indices() const
+    {
+        return BufferViewT<IsConst, int>{m_row_indices,
+                                         size_t{m_triplet_index_offset},
+                                         size_t{m_triplet_count}};
+    }
+
+    MUDA_GENERIC auto col_indices() const
+    {
+        return BufferViewT<IsConst, int>{m_col_indices,
+                                         size_t{m_triplet_index_offset},
+                                         size_t{m_triplet_count}};
+    }
+
+    MUDA_GENERIC auto values() const
+    {
+        return BufferViewT<IsConst, ValueT>{
+            m_values, size_t{m_triplet_index_offset}, size_t{m_triplet_count}};
+    }
 };
 
 template <typename Ty, int M, int N = M>

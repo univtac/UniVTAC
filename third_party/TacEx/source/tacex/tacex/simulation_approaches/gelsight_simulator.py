@@ -44,10 +44,6 @@ class GelSightSimulator(ABC):
     def marker_motion_simulation(self):
         """Simulates the marker motion of a Tactile sensor."""
         raise NotImplementedError
-    
-    def marker_rgb_simulation(self):
-        """Simulates the marker rgb image of a Tactile sensor."""
-        raise NotImplementedError
 
     # @abstractmethod make it optional, in case another method is used for computing indentation depth
     def compute_indentation_depth(self):

@@ -11,6 +11,8 @@
 #include <Eigen/Geometry>
 #include <igl/readSTL.h>
 #include <igl/readPLY.h>
+#include "stl_reader.h"
+#include <igl/remove_duplicate_vertices.h>
 
 namespace uipc::geometry
 {
@@ -31,10 +33,14 @@ using Eigen::VectorXi;
 
 namespace fs = std::filesystem;
 
+static void apply_pre_transform(Vector3& v, const Matrix4x4& pre_transform) noexcept
+{
+    v = (pre_transform * v.homogeneous()).head<3>();
+}
 
 void SimplicialComplexIO::apply_pre_transform(Vector3& v) const noexcept
 {
-    v = (m_pre_transform * v.homogeneous()).head<3>();
+    ::uipc::geometry::apply_pre_transform(v, m_pre_transform);
 }
 
 SimplicialComplex SimplicialComplexIO::read(std::string_view file_name)
@@ -54,6 +60,10 @@ SimplicialComplex SimplicialComplexIO::read(std::string_view file_name)
     else if(ext == ".ply")
     {
         return read_ply(file_name);
+    }
+    else if(ext == ".stl")
+    {
+        return read_stl(file_name);
     }
     else
     {
@@ -80,10 +90,12 @@ SimplicialComplex SimplicialComplexIO::read_msh(std::string_view file_name)
         throw GeometryIOError{fmt::format("Failed to load .msh file: {}", file_name)};
     }
 
-    if constexpr (std::is_same_v<double, Float>) {
+    if constexpr(std::is_same_v<double, Float>)
+    {
         X = std::move(doubleX);
     }
-    else {
+    else
+    {
         X = doubleX.cast<Float>();
     }
     vector<Vector3> Vs;
@@ -100,13 +112,124 @@ SimplicialComplex SimplicialComplexIO::read_msh(std::string_view file_name)
     return tetmesh(Vs, Ts);
 }
 
-SimplicialComplex SimplicialComplexIO::read_obj(std::string_view file_name)
+bool obj_is_pure_line_mesh(std::string_view file_name)
 {
-    if(!std::filesystem::exists(file_name))
+    std::ifstream ifs(file_name.data());
+    if(!ifs)
+        throw GeometryIOError{fmt::format("Failed to open file: {}", file_name)};
+    std::string line;
+    while(std::getline(ifs, line))
     {
-        throw GeometryIOError{fmt::format("File does not exist: {}", file_name)};
+        std::istringstream ss(line);
+        std::string        type;
+        ss >> type;
+        if(type == "f")
+            return false;  // found a face, not a pure line mesh
     }
-    // TODO: We may want to take more information from the .obj file
+    return true;  // no faces found, pure line mesh
+}
+
+template <typename DerivedV, typename DerivedE>
+bool obj_read_linemesh_(const std::string&                str,
+                        Eigen::PlainObjectBase<DerivedV>& V,
+                        Eigen::PlainObjectBase<DerivedE>& E)
+{
+    std::ifstream ifs(str.c_str());
+    if(!ifs)
+    {
+        return false;
+    }
+    std::string                            line;
+    int                                    line_number = 0;
+    std::vector<typename DerivedV::Scalar> verts;
+    std::vector<typename DerivedE::Scalar> lines;
+    while(std::getline(ifs, line))
+    {
+        line_number++;
+        std::istringstream ss(line);
+        std::string        type;
+        ss >> type;
+
+        if(type == "v")
+        {
+            typename DerivedV::Scalar x, y, z;
+            ss >> x >> y >> z;
+            verts.emplace_back(x);
+            verts.emplace_back(y);
+            verts.emplace_back(z);
+        }
+        else if(type == "l")
+        {
+            std::vector<typename DerivedE::Scalar> idxs;
+            typename DerivedE::Scalar              idx;
+            while(ss >> idx)
+            {
+                idxs.push_back(idx);
+            }
+            if(idxs.size() >= 2)
+            {
+                lines.push_back(idxs[0] - 1);
+                lines.push_back(idxs[1] - 1);
+            }
+        }
+        else if(type == "f")
+        {
+            UIPC_ASSERT(false,
+                        "Found face in line mesh .obj file at line {}. "
+                        "This is not a pure line mesh.",
+                        line_number);
+        }
+    }
+
+    V.resize(verts.size() / 3, 3);
+    for(int i = 0; i < V.rows(); ++i)
+    {
+        V(i, 0) = verts[3 * i];
+        V(i, 1) = verts[3 * i + 1];
+        V(i, 2) = verts[3 * i + 2];
+    }
+
+    E.resize(lines.size() / 2, 2);
+    for(int i = 0; i < E.rows(); ++i)
+    {
+        E(i, 0) = lines[2 * i];
+        E(i, 1) = lines[2 * i + 1];
+    }
+
+    return true;
+}
+
+SimplicialComplex obj_read_linemesh(std::string_view file_name, const Matrix4x4& pre_trans)
+{
+    fs::path path{file_name};
+    auto     ext = path.extension().string();
+    // lowercase the extension
+    std::ranges::transform(ext, ext.begin(), ::tolower);
+
+    RowMajorMatrix<Float>  X;
+    RowMajorMatrix<IndexT> E;
+    if(!obj_read_linemesh_(string{file_name}, X, E))
+    {
+        throw GeometryIOError{fmt::format("Failed to load .obj file: {}", file_name)};
+    }
+    vector<Vector3> Vs;
+    Vs.resize(X.rows());
+    for(auto&& [i, v] : enumerate(Vs))
+    {
+        v = X.row(i);
+        apply_pre_transform(v, pre_trans);
+    }
+    vector<Vector2i> Es;
+    Es.resize(E.rows());
+    for(auto&& [i, l] : enumerate(Es))
+        l = E.row(i);
+    return linemesh(Vs, Es);
+}
+
+SimplicialComplex obj_read_trimesh(std::string_view file_name, const Matrix4x4& pre_transform)
+{
+    SimplicialComplexIO io{pre_transform};
+
     RowMajorMatrix<Float>  X;
     RowMajorMatrix<IndexT> F;
     if(!igl::read_triangle_mesh(string{file_name}, X, F))
@@ -118,13 +241,31 @@ SimplicialComplex SimplicialComplexIO::read_obj(std::string_view file_name)
     for(auto&& [i, v] : enumerate(Vs))
     {
         v = X.row(i);
-        apply_pre_transform(v);
+        apply_pre_transform(v, pre_transform);
     }
     vector<Vector3i> Fs;
     Fs.resize(F.rows());
     for(auto&& [i, f] : enumerate(Fs))
         f = F.row(i);
+
     return trimesh(Vs, Fs);
+}
+
+SimplicialComplex SimplicialComplexIO::read_obj(std::string_view file_name)
+{
+    if(!std::filesystem::exists(file_name))
+    {
+        throw GeometryIOError{fmt::format("File does not exist: {}", file_name)};
+    }
+
+    if(obj_is_pure_line_mesh(file_name))
+    {
+        return obj_read_linemesh(file_name, m_pre_transform);
+    }
+    else
+    {
+        return obj_read_trimesh(file_name, m_pre_transform);
+    }
 }
 
 SimplicialComplex SimplicialComplexIO::read_ply(std::string_view file_name)
@@ -155,6 +296,54 @@ SimplicialComplex SimplicialComplexIO::read_ply(std::string_view file_name)
         f = F.row(i);
 
     return trimesh(Vs, Fs);
+}
+
+SimplicialComplex SimplicialComplexIO::read_stl(std::string_view file_name)
+{
+    if(!std::filesystem::exists(file_name))
+    {
+        throw GeometryIOError{fmt::format("File does not exist: {}", file_name)};
+    }
+
+    stl_reader::StlMesh<Float, IndexT> mesh{std::string{file_name}};
+    span<const Vector3>  Vs{reinterpret_cast<const Vector3*>(mesh.raw_coords()),
+                           mesh.num_vrts()};
+    span<const Vector3i> Fs{reinterpret_cast<const Vector3i*>(mesh.raw_tris()),
+                            mesh.num_tris()};
+
+    RowMajorMatrix<Float>  V(Vs.size(), 3);
+    RowMajorMatrix<IndexT> F(Fs.size(), 3);
+
+
+    for(auto&& [i, v] : enumerate(Vs))
+    {
+        V.row(i) = v;
+    }
+
+    for(auto&& [i, f] : enumerate(Fs))
+    {
+        F.row(i) = f;
+    }
+
+    Eigen::MatrixXd V_new;
+    Eigen::MatrixXi F_new;
+    Eigen::VectorXi SVI, SVJ;
+    igl::remove_duplicate_vertices(V, F, 1e-7, V_new, SVI, SVJ, F_new);
+
+    vector<Vector3> Vs_new;
+    Vs_new.resize(V_new.rows());
+    for(auto&& [i, v] : enumerate(Vs_new))
+    {
+        v = V_new.row(i);
+        apply_pre_transform(v);
+    }
+
+    vector<Vector3i> Fs_new;
+    Fs_new.resize(F_new.rows());
+    for(auto&& [i, f] : enumerate(Fs_new))
+        f = F_new.row(i);
+
+    return trimesh(Vs_new, Fs_new);
 }
 
 void SimplicialComplexIO::write(std::string_view file_name, const SimplicialComplex& sc)
@@ -201,7 +390,7 @@ void SimplicialComplexIO::write_obj(std::string_view file_name, const Simplicial
 
     if(Vs.size() == 0)
     {
-        spdlog::warn("No vertices found in the simplicial complex. Writing an empty .obj file.");
+        logger::warn("No vertices found in the simplicial complex. Writing an empty .obj file.");
     }
 
     auto Es = sc.edges().size() > 0 ? sc.edges().topo().view() : span<const Vector2i>{};
@@ -290,7 +479,6 @@ void SimplicialComplexIO::write_obj(std::string_view file_name, const Simplicial
     std::fclose(fp);
 }
 
-
 void SimplicialComplexIO::write_msh(std::string_view file_name, const SimplicialComplex& sc)
 {
     const auto Dim = sc.dim();
@@ -306,7 +494,7 @@ void SimplicialComplexIO::write_msh(std::string_view file_name, const Simplicial
 
     if(Vs.size() == 0)
     {
-        spdlog::warn("No vertices found in the simplicial complex. Writing an empty .msh file.");
+        logger::warn("No vertices found in the simplicial complex. Writing an empty .msh file.");
     }
 
     fmt::println(fp,
@@ -335,7 +523,7 @@ $EndMeshFormat
                                                span<const Vector4i>{};
         if(Ts.size() == 0)
         {
-            spdlog::warn("No tetrahedra found in the simplicial complex. Writing only vertices.");
+            logger::warn("No tetrahedra found in the simplicial complex. Writing only vertices.");
         }
 
         fmt::println(fp, "{}", Ts.size());
@@ -361,7 +549,7 @@ $EndMeshFormat
 
         if(Fs.size() == 0)
         {
-            spdlog::warn("No triangles found in the simplicial complex 2D. Writing only vertices.");
+            logger::warn("No triangles found in the simplicial complex 2D. Writing only vertices.");
         }
 
         fmt::println(fp, "{}", Fs.size());
@@ -386,7 +574,7 @@ $EndMeshFormat
 
         if(Es.size() == 0)
         {
-            spdlog::warn("No edges found in the simplicial complex 1D. Writing only vertices.");
+            logger::warn("No edges found in the simplicial complex 1D. Writing only vertices.");
         }
 
         fmt::println(fp, "{}", Es.size());

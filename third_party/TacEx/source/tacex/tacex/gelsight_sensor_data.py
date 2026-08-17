@@ -14,7 +14,7 @@ class GelSightSensorData:
     intrinsic_matrix: np.ndarray = None
     """The intrinsic matrix for the camera."""
     image_resolution: tuple[int, int] = None
-    """A tuple containing (height, width) of the camera sensor."""
+    """A tuple containing (width, height) of the camera sensor."""
     output: dict[str, Any] = None
     """The retrieved sensor data with sensor types as key.
 

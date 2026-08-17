@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include <affine_body/affine_body_constitution.h>
+#include <affine_body/affine_body_extra_constitution.h>
 #include <Eigen/Dense>
 #include <uipc/common/enumerate.h>
 #include <uipc/common/range.h>
@@ -22,12 +23,9 @@
 #include <muda/ext/eigen/inverse.h>
 #include <uipc/builtin/attribute_name.h>
 
-#include <iostream>
-
 #include <utils/offset_count_collection.h>
 #include <affine_body/affine_body_kinetic.h>
-
-
+#include <affine_body/affine_body_vertex_reporter.h>
 
 namespace uipc::backend
 {
@@ -54,6 +52,10 @@ REGISTER_SIM_SYSTEM(AffineBodyDynamics);
 
 void AffineBodyDynamics::do_build()
 {
+    auto& config         = world().scene().config();
+    auto  d_hat_attr     = config.find<Float>("contact/d_hat");
+    m_impl.default_d_hat = d_hat_attr->view()[0];
+
     // Register the action to write the scene
     on_write_scene([this] { m_impl.write_scene(world()); });
 }
@@ -78,11 +80,6 @@ void AffineBodyDynamics::do_clear_recover(RecoverInfo& info)
     m_impl.clear_recover(info);
 }
 
-bool AffineBodyDynamics::do_write_vertex_pos_to_sim(span<const Vector3> positions, IndexT vertex_offset, SizeT vertex_count)
-{
-    return m_impl.write_vertex_pos_to_sim(positions, vertex_offset, vertex_count);
-}
-
 IndexT AffineBodyDynamics::dof_offset(SizeT frame) const
 {
     return m_impl.dof_offset(frame);
@@ -99,6 +96,12 @@ void AffineBodyDynamics::add_constitution(AffineBodyConstitution* constitution)
     // set the temp index, later we will sort constitution by uid
     // and reset the index
     m_impl.constitutions.register_subsystem(*constitution);
+}
+
+void AffineBodyDynamics::add_extra_constitution(AffineBodyExtraConstitution* constitution)
+{
+    check_state(SimEngineState::BuildSystems, "add_extra_constitution()");
+    m_impl.extra_constitutions.register_subsystem(*constitution);
 }
 
 void AffineBodyDynamics::add_kinetic(AffineBodyKinetic* kinetic)
@@ -127,11 +130,12 @@ void AffineBodyDynamics::Impl::init(WorldVisitor& world)
     _build_constitutions(world);
     _build_geo_infos(world);
     _setup_geometry_attributes(world);
-
     _build_geometry_on_host(world);
     _build_geometry_on_device(world);
 
     _distribute_geo_infos();
+
+    _init_extra_constitutions();
 
     _init_diff_reporters();
 }
@@ -266,8 +270,8 @@ void AffineBodyDynamics::Impl::_build_geo_infos(WorldVisitor& world)
 
     std::ranges::transform(geo_infos,
                            geo_body_counts.begin(),
-                           [](const GeoInfo& info) -> SizeT
-                           { return info.body_count; });
+                           [](const GeoInfo& info) -> IndexT
+                           { return static_cast<IndexT>(info.body_count); });
 
     geo_body_offsets_counts.scan();
 
@@ -394,12 +398,17 @@ void AffineBodyDynamics::Impl::_build_geometry_on_host(WorldVisitor& world)
     // 3) Setup:
     // - `vertex_id_to_body_id`
     // - `vertex_id_to_contact_element_id`
+    // - `vertex_id_to_d_hat`
     {
         h_vertex_id_to_body_id.resize(abd_vertex_count);
         h_vertex_id_to_contact_element_id.resize(abd_vertex_count);
+        h_vertex_id_to_subscene_contact_element_id.resize(abd_vertex_count);
+        h_vertex_id_to_d_hat.resize(abd_vertex_count);
 
-        span v2b = h_vertex_id_to_body_id;
-        span v2c = h_vertex_id_to_contact_element_id;
+        span v2b     = h_vertex_id_to_body_id;
+        span v2c     = h_vertex_id_to_contact_element_id;
+        span v2sc    = h_vertex_id_to_subscene_contact_element_id;
+        span v2d_hat = h_vertex_id_to_d_hat;
 
         for_each(
             geo_slots,
@@ -415,16 +424,24 @@ void AffineBodyDynamics::Impl::_build_geometry_on_host(WorldVisitor& world)
                 auto vert_contact_element_id =
                     sc.vertices().find<IndexT>(builtin::contact_element_id);
 
+                auto vert_contact_subscene_element_id =
+                    sc.vertices().find<IndexT>(builtin::subscene_element_id);
+
                 auto contact_element_id =
                     sc.meta().find<IndexT>(builtin::contact_element_id);
+
+                auto subscene_element_id =
+                    sc.meta().find<IndexT>(builtin::subscene_element_id);
 
                 for(auto i : range(body_count))
                 {
                     auto body_vert_offset = vert_offset + i * vert_count;
                     auto body_id          = body_offset + i;
 
-                    auto v2b_span = v2b.subspan(body_vert_offset, vert_count);
-                    auto v2c_span = v2c.subspan(body_vert_offset, vert_count);
+                    auto v2b_span  = v2b.subspan(body_vert_offset, vert_count);
+                    auto v2c_span  = v2c.subspan(body_vert_offset, vert_count);
+                    auto v2sc_span = v2sc.subspan(body_vert_offset, vert_count);
+                    auto v2d_hat_span = v2d_hat.subspan(body_vert_offset, vert_count);
 
                     std::ranges::fill(v2b_span, body_id);
 
@@ -449,9 +466,48 @@ void AffineBodyDynamics::Impl::_build_geometry_on_host(WorldVisitor& world)
                         }
                         else
                         {
-                            std::ranges::fill(v2c_span,
-                                              0);  // default 0
+                            std::ranges::fill(v2c_span, 0);  // default 0
                         }
+                    }
+
+                    if(vert_contact_subscene_element_id)
+                    {
+                        auto vert_contact_subscene_element_id_view =
+                            vert_contact_subscene_element_id->view();
+
+                        UIPC_ASSERT(vert_contact_subscene_element_id_view.size() == vert_count,
+                                    "The size of the contact_element_id attribute is not equal to the vertex count ({} != {}).",
+                                    vert_contact_subscene_element_id_view.size(),
+                                    vert_count);
+
+                        std::ranges::copy(vert_contact_subscene_element_id_view,
+                                          v2sc_span.begin());
+                    }
+                    else
+                    {
+                        if(subscene_element_id)
+                        {
+                            auto contact_subscene_element_id_view =
+                                subscene_element_id->view();
+                            std::ranges::fill(v2sc_span,
+                                              contact_subscene_element_id_view.front());
+                        }
+                        else
+                        {
+                            std::ranges::fill(v2sc_span, 0);  // default 0
+                        }
+                    }
+
+                    auto meta_d_hat = sc.meta().find<Float>(builtin::d_hat);
+
+                    if(meta_d_hat)
+                    {
+                        auto vert_d_hat_view = meta_d_hat->view();
+                        std::ranges::fill(v2d_hat_span, vert_d_hat_view.front());  // use the meta d_hat value
+                    }
+                    else
+                    {
+                        std::ranges::fill(v2d_hat_span, default_d_hat);  // default d_hat
                     }
                 }
             });
@@ -537,9 +593,9 @@ void AffineBodyDynamics::Impl::_build_geometry_on_host(WorldVisitor& world)
 
     // 6) Setup the affine body gravity
     {
-        span Js = h_vertex_id_to_J;
-
-        Vector3 gravity = scene.info()["gravity"];
+        span    Js           = h_vertex_id_to_J;
+        auto    gravity_attr = scene.config().find<Vector3>("gravity");
+        Vector3 gravity      = gravity_attr->view()[0];
         h_body_id_to_abd_gravity.resize(abd_body_count, Vector12::Zero());
         for_each(geo_slots,
                  [&](const ForEachInfo& I, geometry::SimplicialComplex& sc)
@@ -705,6 +761,14 @@ void AffineBodyDynamics::Impl::_init_dof_info()
     frame_to_dof_count.push_back(0);
 }
 
+void AffineBodyDynamics::Impl::_init_extra_constitutions()
+{
+    for(auto&& c : extra_constitutions.view())
+    {
+        c->init();
+    }
+}
+
 void AffineBodyDynamics::Impl::_init_diff_reporters()
 {
     //for(auto&& reporter : diff_parm_reporter.view())
@@ -742,9 +806,9 @@ void AffineBodyDynamics::Impl::write_scene(WorldVisitor& world)
         [&](const ForEachInfo& I, Matrix4x4& trans)
         {
             auto bodyI = I.global_index();
-            
+
             Vector12& q = h_body_id_to_q[bodyI];
-            
+
             trans = q_to_transform(q);
         });
 }
@@ -799,37 +863,6 @@ void AffineBodyDynamics::Impl::clear_recover(RecoverInfo& info)
     dump_q_v.clean_up();
     dump_q_prev.clean_up();
 }
-
-//TODO just give over a transformation matrix for `reset`?
-//TODO do it in batches instead of single call per obj
-bool AffineBodyDynamics::Impl::write_vertex_pos_to_sim(span<const Vector3> positions, IndexT vertex_offset, SizeT vertex_count)
-{
-    // const auto& scene = this->world().scene();
-    // auto geo_slots = scene.geometries();
-
-    //TODO I probably should write a new method for this? / a different method, cause we dont really update vertex positions here
-
-    std::cout << "write_vertex_pos_to_sim ABD: " <<"\n";
-    
-    std::cout << "vertex_offset " << vertex_offset << "\n";
-    std::cout << "vertex_count " << vertex_count << "\n";
-
-    // setup default q
-    Matrix4x4 identity_trans = Transform::Identity().matrix();
-    vector<Vector12> q = {transform_to_q(identity_trans)};
-
-    // buffer.resize(byte_buffer.size() / sizeof(T));
-    // not really vertex offset -> its actually `bodyI`
-    body_id_to_q.view(vertex_offset, 1).copy_from(span{q}.data());
-    body_id_to_q_prev.view(vertex_offset, 1).copy_from(span{q}.data());
-    
-    vector<Vector12> vel = {Vector12::Zero()};
-    body_id_to_q_v.view(vertex_offset, 1).copy_from(span{vel}.data());
-    
-    return true;
-}
-
-
 }  // namespace uipc::backend::cuda
 
 namespace uipc::backend::cuda

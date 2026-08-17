@@ -25,14 +25,13 @@ class UIPC_CORE_API WorldVisitor
     WorldVisitor(const WorldVisitor&)            = delete;
     WorldVisitor(WorldVisitor&&)                 = default;
     WorldVisitor& operator=(const WorldVisitor&) = delete;
-    WorldVisitor& operator=(WorldVisitor&&)      = default;
+    WorldVisitor& operator=(WorldVisitor&&)      = delete;
 
     SceneVisitor    scene() noexcept;
     AnimatorVisitor animator() noexcept;
-    core::World&    ref() noexcept;
+    core::World     get() const noexcept;
 
   private:
-    mutable S<core::World> m_ref;
     core::internal::World& m_world;
 };
 }  // namespace uipc::backend

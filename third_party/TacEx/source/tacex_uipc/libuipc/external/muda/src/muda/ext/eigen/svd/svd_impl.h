@@ -44,13 +44,13 @@ __device__ __forceinline__ void svd3x3(float  a11,
                                        float& v33  // output V
 )
 {
-    constexpr auto  gone                  = 1065353216;
-    constexpr auto  gsine_pi_over_eight   = 1053028117;
-    constexpr auto  gcosine_pi_over_eight = 1064076127;
-    constexpr float gone_half             = 0.5;
-    constexpr float gsmall_number         = 1.e-12;
-    constexpr float gtiny_number          = 1.e-20;
-    constexpr float gfour_gamma_squared   = 5.8284273147583007813;
+    constexpr auto gone                  = 1065353216;
+    constexpr auto gsine_pi_over_eight   = 1053028117;
+    constexpr auto gcosine_pi_over_eight = 1064076127;
+    // constexpr float gone_half             = 0.5;
+    constexpr float gsmall_number       = 1.e-12;
+    constexpr float gtiny_number        = 1.e-20;
+    constexpr float gfour_gamma_squared = 5.8284273147583007813;
 
     un Sa11, Sa21, Sa31, Sa12, Sa22, Sa32, Sa13, Sa23, Sa33;
     un Su11, Su21, Su31, Su12, Su22, Su32, Su13, Su23, Su33;

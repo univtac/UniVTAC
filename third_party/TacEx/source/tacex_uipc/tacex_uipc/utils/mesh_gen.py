@@ -1,10 +1,8 @@
 # import pymesh
 # from meshpy.tet import MeshInfo, build, Options
-# from isaacsim.util.debug_draw import _debug_draw
 from omni.physx.scripts import deformableUtils
-from pxr import Sdf, Usd, UsdGeom
-
-# draw = _debug_draw.acquire_debug_draw_interface()
+from pxr import Sdf, Usd, UsdGeom, Vt, Gf
+import omni.usd
 
 import numpy as np
 import random
@@ -12,6 +10,12 @@ import random
 import wildmeshing as wm
 
 from isaaclab.utils import configclass
+
+from .create_surf_triangle_vis_material import (
+    add_barycentric_primvar,
+    create_surf_tri_vis_material,
+    assign_material_to_mesh_with_usd,
+)
 
 
 @configclass
@@ -22,19 +26,19 @@ class TetMeshCfg:
 
     """
 
-    stop_quality: int = 10
+    stop_quality: int = 8
     """
     Max AMIPS energy for stopping mesh optimization.
 
     Larger means less optimization and sooner stopping.
     """
 
-    max_its: int = 80
+    max_its: int = 100
     """
     Max number of mesh optimization iterations.
     """
 
-    epsilon_r: float = 1e-2
+    epsilon_r: float = 0.01
     """ Relative envelope epsilon_r (definies the envelope size).
 
     -> Absolute epsilon = epsilon_r * diagonal_of_bbox.
@@ -43,7 +47,7 @@ class TetMeshCfg:
     Large Envelope + large edge_length = tetmesh with low res
     """
 
-    edge_length_r: float = 1 / 2
+    edge_length_r: float = 0.05
     """ Relative target edge length l_r.
 
     -> Absolute l = l_r * diagonal_of_bbox.
@@ -51,9 +55,11 @@ class TetMeshCfg:
     Smaller edge length gives denser mesh.
     """
 
-    skip_simplify: bool = False
+    skip_simplify: bool = True
+    """Simplify the input mesh"""
 
     coarsen: bool = True
+    """ Coarsen the output mesh as much as possible"""
 
     log_level: int = 6
     """
@@ -85,11 +91,11 @@ class TriMeshCfg:
     """ Relative envelope epsilon_r (definies the envelope size).
     -> Absolute epsilon = epsilon_r * diagonal_of_bbox.
 
-    Smaller envelope pereserves features better.
+    Smaller envelope preserves features better.
     Larger Envelope + larger edge_length = tetmesh with low res
     """
 
-    edge_length_r: float = 1 / 2
+    edge_length_r: float = 0.5
     """ Relative target edge length l_r.
     -> Absolute l = l_r * diagonal_of_bbox.
 
@@ -203,6 +209,21 @@ class MeshGenerator:
 
     #     return mesh
     def generate_tet_mesh_for_prim(self, prim: UsdGeom.Mesh):
+        """Generates a Tetrahedra mesh for the given gmesh.
+
+        With wildmeshing its not guaranteed that the output tet mesh matches the input triangle mesh perfectly.
+
+        Args:
+            prim: The gmesh which should be converted into a tet mesh.
+
+        Returns:
+            tet_mesh_points: The points (x,y,z) of the tet mesh.
+            tet_indices: The indices that define the meshes. 4 consecutive values make up a tetrahedra.
+            surf_points: The points (x,y,z) which are at the surface of the tet mesh. The values also appear in tet_mesh_points,
+                         but are returned separately for the surf_indices list.
+            surf_indices: The indices that define the surface triangles of the tet mesh. 3 consecutive values make up a triangle.
+                          The indices are defined w.r.t to the surf_points (and not the tet_mesh_points!).
+        """
         # compute mesh
         points = np.array(prim.GetPointsAttr().Get())
         # triangles is a list of indices: every 3 consecutive indices form a triangle
@@ -248,6 +269,7 @@ class MeshGenerator:
         # #     draw.draw_lines([tri_points[0]]*2, tri_points[1:], [(255,255,255,0.5)]*2, [10]*2) # draw from point 0 to every other point (3 times 0, cause line from 0 to the other 3 points)
         # #     draw.draw_lines([tri_points[1]], [tri_points[2]], [(255,255,255,0.5)], [10])
 
+        # NOTE: Cannot mute prints of wildmeshing -> log_level=6 doesn't remove prints completely...
         self.tetrahedralizer.set_mesh(points, triangles)
         self.tetrahedralizer.tetrahedralize()
         tet_points, tet_indices, _ = self.tetrahedralizer.get_tet_mesh(
@@ -264,52 +286,65 @@ class MeshGenerator:
         return tet_points, tet_indices, surf_points, surf_indices
 
     @staticmethod
-    def update_usd_mesh(prim: UsdGeom.Mesh, surf_points, triangles: list[int], replace_color:bool=False):
+    def update_usd_mesh(gprim: UsdGeom.Mesh, surf_points, triangles: list[int]):
         triangles = np.array(triangles).reshape(-1, 3)
 
-        prim.GetPointsAttr().Set(surf_points)
-        prim.GetFaceVertexCountsAttr().Set(
+        gprim.GetPointsAttr().Set(surf_points)
+        gprim.GetFaceVertexCountsAttr().Set(
             [3] * triangles.shape[0]
-        )  # how many vertices each face has (3, cause triangles)
-        prim.GetFaceVertexIndicesAttr().Set(triangles)
-        prim.GetNormalsAttr().Set([])  # set to be empty, cause we use catmullClark and this gives us normals
-        prim.SetNormalsInterpolation(UsdGeom.Tokens.faceVarying)
-        # prim.GetSubdivisionSchemeAttr().Set("catmullClark") #none
+        )  # how many vertices each face has (-> 3, cause triangles)
+        gprim.GetFaceVertexIndicesAttr().Set(triangles)
 
-        # set color with per face interpolation
-        if replace_color:
-            colors = [
-                (random.uniform(0.0, 0.0), random.uniform(0.0, 0.75), random.uniform(0.0, 0.75))
-                for _ in range(triangles.shape[0] * 3)
-            ]
-            prim.CreateDisplayColorPrimvar(UsdGeom.Tokens.faceVarying).Set(colors)  # num_surf_tri * 3
+        # prim.GetNormalsAttr().Set(triangles_orient)
+        # prim.SetNormalsInterpolation(UsdGeom.Tokens.faceVarying)
 
-        # texture map
+        gprim.GetNormalsAttr().Set([])
+        gprim.SetNormalsInterpolation(UsdGeom.Tokens.vertex)
+        # prim.GetSubdivisionSchemeAttr().Set("catmullClark") #"none"
+
+        # set color with per face interpolation for visualizing surface triangles
+        colors = [
+            (random.uniform(0.0, 0.0), random.uniform(0.0, 1.0), random.uniform(0.0, 1.0))
+            for _ in range(triangles.shape[0] * 3)
+        ]
+        pv_display_color = gprim.CreateDisplayColorPrimvar(
+            UsdGeom.Tokens.faceVarying
+        )  # UsdGeom.Tokens.faceVarying, default is "vertex"
+        # colors = Vt.Vec3fArray([Gf.Vec3f(0.6, 0.6, 0.8)] * surf_points.shape[0])
+        colors = Vt.Vec3fArray([Gf.Vec3f(0.6, 0.6, 0.8)] * 3 * triangles.shape[0])  # one color for each vertex
+        pv_display_color.Set(colors)  # num_surf_tri * 3
+
+        # set default uv_coor data for texture map
+        # for faceVarying interpolation, length equals sum of vertices-per-face (i.e., size of mesh.GetFaceVertexIndicesAttr()).
         uv_coor = np.indices((int(triangles.size), 2)).transpose((1, 2, 0)).reshape((-1, 2))
 
-        pv_api = UsdGeom.PrimvarsAPI(prim)
-        if pv_api.HasPrimvar("primvars:st"):
-            pv = pv_api.GetPrimvar("primvars:st")
-            pv.SetInterpolation(UsdGeom.Tokens.faceVarying)
+        pv_api = UsdGeom.PrimvarsAPI(gprim)
+        if pv_api.HasPrimvar("st"):
+            pv_st = pv_api.GetPrimvar("st")
+            # pv.SetInterpolation(UsdGeom.Tokens.faceVarying)
             # if uv_coor.size != pv.Get():
             #     print("primvars:st array has the wrong size - updating it")
             #     pv.Set(uv_coor)
         else:
             # set some values for the uv_coor variable, if no values exist
-            pv = pv_api.CreatePrimvar(
-                "primvars:st",
-                Sdf.ValueTypeNames.TexCoord2fArray,
+            pv_st = pv_api.CreatePrimvar(
+                "st",
+                Sdf.ValueTypeNames.Float2Array,
+                # Sdf.ValueTypeNames.TexCoord2fArray,
                 UsdGeom.Tokens.faceVarying,
                 # UsdGeom.Tokens.uniform,
                 uv_coor.size,
             )
-            pv.Set(uv_coor)
+        # t = pv_st.GetIndicesAttr().Get()
+        # if pv_st.GetIndicesAttr().Get() is None:
+        #     t = pv_st.CreateIndicesAttr()
+        pv_st.Set(uv_coor)
 
     @staticmethod
     def update_usd_mesh_with_uipc_surface(prim: Usd.Prim):
         """Method to update render mesh topology based on the surface of the mesh in UIPC.
 
-        Used for workaround so that textures can be applied to the meshes.
+        Used as a workaround so that textures can be applied to the meshes.
         """
         from uipc.geometry import extract_surface, flip_inward_triangles, label_surface, label_triangle_orient, tetmesh
 
@@ -340,7 +375,7 @@ class MeshGenerator:
 
         # update render mesh
         prim = UsdGeom.Mesh(prim)
-
+        MeshGenerator.update_usd_mesh(prim, surf_points, triangles)
         triangles = np.array(triangles).reshape(-1, 3)
         prim.GetPointsAttr().Set(surf_points)
         prim.GetFaceVertexCountsAttr().Set(

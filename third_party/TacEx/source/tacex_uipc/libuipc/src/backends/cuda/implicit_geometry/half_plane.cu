@@ -82,29 +82,33 @@ void HalfPlane::Impl::_build_geometry()
         });
 
     vector<IndexT> geo_to_contact_id(geos.size(), 0);
-    vector<IndexT> geo_to_contact_masks(geos.size(), 0);
+
+    vector<IndexT> geo_to_subscene_id(geos.size(), 0);
 
     for(auto&& [i, g] : enumerate(geos))
     {
         auto cid = g->meta().find<IndexT>(builtin::contact_element_id);
         geo_to_contact_id[i] = cid ? cid->view()[0] : 0;
+
+        auto sid = g->meta().find<IndexT>(builtin::subscene_element_id);
+        geo_to_subscene_id[i] = sid ? sid->view()[0] : 0;
     }
 
     h_contact_ids.resize(instance_count, 0);
+    h_subscene_ids.resize(instance_count, 0);
 
     for(auto&& i : range(instance_count))
     {
-        auto G           = I2G[i];
-        h_contact_ids[i] = geo_to_contact_id[G];
+        auto G            = I2G[i];
+        h_contact_ids[i]  = geo_to_contact_id[G];
+        h_subscene_ids[i] = geo_to_subscene_id[G];
     }
 
     positions.resize(h_positions.size());
     normals.resize(h_normals.size());
-    contact_ids.resize(h_contact_ids.size());
 
     positions.view().copy_from(h_positions.data());
     normals.view().copy_from(h_normals.data());
-    contact_ids.view().copy_from(h_contact_ids.data());
 
     // compute vertex offsets for each geometry
     geo_vertex_offset_count.resize(geo_infos.size());
@@ -136,9 +140,5 @@ muda::CBufferView<Vector3> HalfPlane::normals() const
 muda::CBufferView<Vector3> HalfPlane::positions() const
 {
     return m_impl.positions;
-}
-muda::CBufferView<IndexT> HalfPlane::contact_ids() const
-{
-    return m_impl.contact_ids;
 }
 }  // namespace uipc::backend::cuda

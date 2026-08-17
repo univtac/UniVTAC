@@ -10,6 +10,7 @@ class SubFieldImpl<FieldEntryLayout::AoS> : public SubFieldInterface
 
   protected:
     virtual void build_impl() override;
+
     virtual size_t require_total_buffer_byte_size(size_t element_count) override;
 
     virtual void calculate_new_cores(std::byte*           byte_buffer,

@@ -20,17 +20,12 @@ INSTALL_REQUIRES = [
     #     "torch_scatter @"
     #     " https://data.pyg.org/whl/torch-2.5.0%2Bcu118/torch_scatter-2.1.2%2Bpt25cu118-cp310-cp310-linux_x86_64.whl"
     # ),
-    (  # needed for gpu taxim
+    (  # Isaac Sim 5.1 ships Python 3.11, PyTorch 2.7 and CUDA 12.6
         "torch_scatter @"
-        "https://data.pyg.org/whl/torch-2.8.0%2Bcu128/torch_scatter-2.1.2%2Bpt28cu128-cp310-cp310-linux_x86_64.whl"
+        "https://data.pyg.org/whl/torch-2.7.0%2Bcu126/torch_scatter-2.1.2%2Bpt27cu126-cp311-cp311-linux_x86_64.whl"
     ),
-    # (  # needed for gpu taxim -> for Isaac 5.0
-    #     "torch_scatter @"
-    #     "https://data.pyg.org/whl/torch-2.8.0%2Bcu128/torch_scatter-2.1.2%2Bpt28cu128-cp311-cp311-linux_x86_64.whl"
-    # ),
     "psutil",
     "nvidia-ml-py",
-    "pre-commit",
 ]
 
 # PYTORCH_INDEX_URL = ["https://download.pytorch.org/whl/cu121"]
@@ -52,9 +47,8 @@ setup(
     python_requires=">=3.10",
     classifiers=[
         "Natural Language :: English",
-        "Programming Language :: Python :: 3.10",
-        "Isaac Sim :: 2023.1.1",
-        "Isaac Sim :: 4.5.0",
+        "Programming Language :: Python :: 3.11",
+        "Isaac Sim :: 5.1.0",
     ],
     zip_safe=False,
 )

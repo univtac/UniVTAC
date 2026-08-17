@@ -24,11 +24,14 @@ class SubFieldImpl<FieldEntryLayout::SoA> : public SubFieldInterface
 
   protected:
     virtual void build_impl() override;
+
     virtual size_t require_total_buffer_byte_size(size_t element_count) override;
+
     virtual void calculate_new_cores(std::byte*           byte_buffer,
                                      size_t               total_bytes,
                                      size_t               element_count,
                                      span<FieldEntryCore> new_cores) override;
+
     virtual bool allow_inplace_shrink() const { return false; }
 
   public:

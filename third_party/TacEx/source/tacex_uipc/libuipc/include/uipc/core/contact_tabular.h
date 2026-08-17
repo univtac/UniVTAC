@@ -40,7 +40,7 @@ class UIPC_CORE_API ContactTabular final
                   bool                  enable = true,
                   const Json&           config = default_config());
 
-    ContactModel at(SizeT i, SizeT j) const;
+    ContactModel at(IndexT i, IndexT j) const;
 
     void default_model(Float       friction_rate,
                        Float       resistance,
@@ -51,7 +51,7 @@ class UIPC_CORE_API ContactTabular final
     ContactModel   default_model() const noexcept;
 
 
-    friend void to_json(Json& j, const ContactTabular& ct);
+    friend UIPC_CORE_API void to_json(Json& j, const ContactTabular& ct);
 
     SizeT element_count() const noexcept;
 
@@ -71,5 +71,5 @@ class UIPC_CORE_API ContactTabular final
                      span<const ContactElement>                 ce);
 };
 
-void to_json(Json& j, const ContactTabular& ct);
+UIPC_CORE_API void to_json(Json& j, const ContactTabular& ct);
 }  // namespace uipc::core

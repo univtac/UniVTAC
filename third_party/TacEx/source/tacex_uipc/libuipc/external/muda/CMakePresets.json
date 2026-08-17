@@ -1,0 +1,48 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "config-base",
+      "displayName": "base Configuration",
+      "hidden": true,
+      "description": "Default build using Ninja generator",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "MUDA_FORCE_CHECK": "ON",
+        "MUDA_WITH_CHECK": "ON",
+        "MUDA_WITH_COMPUTE_GRAPH": "ON",
+        "MUDA_WITH_NVTX3": "ON"
+      }
+    },
+    {
+      "name": "ci-release",
+      "displayName": "CI-Release Configuration",
+      "inherits": ["config-base"],
+      "description": "Configuration for CI builds",
+      "cacheVariables": {
+        "MUDA_BUILD_TEST": "ON",
+        "MUDA_BUILD_EXAMPLE": "OFF",
+        "CMAKE_CUDA_ARCHITECTURES": "89",
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "ci-release",
+      "configurePreset": "ci-release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "ci-release",
+      "configurePreset": "ci-release"
+    }
+  ]
+}

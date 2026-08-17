@@ -35,19 +35,24 @@ class GlobalVertexManager final : public SimSystem
     class VertexAttributeInfo
     {
       public:
-        VertexAttributeInfo(Impl* impl, SizeT index) noexcept;
+        VertexAttributeInfo(Impl* impl, SizeT index, SizeT frame) noexcept;
+        SizeT                     frame() const noexcept;
         muda::BufferView<Vector3> rest_positions() const noexcept;
         muda::BufferView<Float>   thicknesses() const noexcept;
         muda::BufferView<IndexT>  coindices() const noexcept;
         muda::BufferView<IndexT>  dimensions() const noexcept;
         muda::BufferView<Vector3> positions() const noexcept;
         muda::BufferView<IndexT>  contact_element_ids() const noexcept;
+        muda::BufferView<IndexT>  subscene_element_ids() const noexcept;
         muda::BufferView<IndexT>  body_ids() const noexcept;
+        // vert-wise d_hat
+        muda::BufferView<Float> d_hats() const noexcept;
 
       private:
         friend class GlobalVertexManager;
         SizeT m_index;
         Impl* m_impl;
+        SizeT m_frame;
     };
 
     class VertexDisplacementInfo
@@ -63,8 +68,6 @@ class GlobalVertexManager final : public SimSystem
         Impl* m_impl;
     };
 
-    void add_reporter(VertexReporter* reporter);
-
     /**
      * @brief A mapping from the global vertex index to the coindices.
      * 
@@ -73,48 +76,69 @@ class GlobalVertexManager final : public SimSystem
      * 2) or any other information that is needed to be stored.
      */
     muda::CBufferView<IndexT> coindices() const noexcept;
+
     /**
      * @brief A mapping from the global vertex index to the body id.
      */
     muda::CBufferView<IndexT> body_ids() const noexcept;
+
+    /**
+     * @brief The d_hat of the vertices.
+     * 
+     * The d_hat is used to compute the penetration depth.
+     */
+    muda::CBufferView<Float> d_hats() const noexcept;
+
     /**
      * @brief The current positions of the vertices.
      */
     muda::CBufferView<Vector3> positions() const noexcept;
+
     /**
      * @brief The positions of the vertices at last time step.
      * 
      * Used to compute the friction.
      */
     muda::CBufferView<Vector3> prev_positions() const noexcept;
+
     /**
      * @brief The rest positions of the vertices.
      * 
      * Can be used to retrieve some quantities at the rest state.
      */
     muda::CBufferView<Vector3> rest_positions() const noexcept;
+
     /**
      * @brief The safe positions of the vertices in line search.
      *  
      * Used as a start point to do the line search.
      */
     muda::CBufferView<Vector3> safe_positions() const noexcept;
+
     /**
      * @brief Indicate the contact element id of the vertices.
      */
     muda::CBufferView<IndexT> contact_element_ids() const noexcept;
+
+    /**
+     * @brief Indicate the contact element id of the vertices.
+     */
+    muda::CBufferView<IndexT> subscene_element_ids() const noexcept;
+
     /**
      * @brief The displacements of the vertices (after solving the linear system).
      * 
      * The displacements are not scaled by the alpha.
      */
     muda::CBufferView<Vector3> displacements() const noexcept;
+
     /**
      * @brief The thicknesses of the vertices.
      * 
      * The thicknesses are used to compute the penetration depth.
      */
     muda::CBufferView<Float> thicknesses() const noexcept;
+
     /**
      * @brief The dimension of the vertices. 
      * - 0: Codim 0D
@@ -135,6 +159,7 @@ class GlobalVertexManager final : public SimSystem
       public:
         Impl() = default;
         void init();
+        void update_attributes(SizeT frame);
         void rebuild();
 
         void record_prev_positions();
@@ -153,11 +178,12 @@ class GlobalVertexManager final : public SimSystem
         bool try_recover(RecoverInfo& info);
         void apply_recover(RecoverInfo& info);
         void clear_recover(RecoverInfo& info);
-        
-        bool write_vertex_pos_to_sim(span<const Vector3> new_positions, IndexT global_vertex_offset, SizeT vertex_count);
+
+        Float default_d_hat = 0.01;
 
         muda::DeviceBuffer<IndexT>  coindices;
         muda::DeviceBuffer<IndexT>  body_ids;
+        muda::DeviceBuffer<Float>   d_hats;
         muda::DeviceBuffer<IndexT>  dimensions;
         muda::DeviceBuffer<Vector3> positions;
         muda::DeviceBuffer<Vector3> prev_positions;
@@ -165,6 +191,7 @@ class GlobalVertexManager final : public SimSystem
         muda::DeviceBuffer<Vector3> safe_positions;
         muda::DeviceBuffer<Float>   thicknesses;
         muda::DeviceBuffer<IndexT>  contact_element_ids;
+        muda::DeviceBuffer<IndexT>  subscene_element_ids;
         muda::DeviceBuffer<Vector3> displacements;
         muda::DeviceBuffer<Float>   displacement_norms;
 
@@ -172,6 +199,7 @@ class GlobalVertexManager final : public SimSystem
         muda::DeviceVar<Float>   max_disp_norm;
         muda::DeviceVar<Vector3> min_pos;
         muda::DeviceVar<Vector3> max_pos;
+
 
         SimSystemSlotCollection<VertexReporter> vertex_reporters;
 
@@ -190,13 +218,19 @@ class GlobalVertexManager final : public SimSystem
     virtual void do_apply_recover(RecoverInfo& info) override;
     virtual void do_clear_recover(RecoverInfo& info) override;
 
-    virtual bool do_write_vertex_pos_to_sim(span<const Vector3> new_positions, IndexT global_vertex_offset, SizeT vertex_count) override;
-  
   private:
     friend class SimEngine;
     friend class MaxTranslationChecker;
     friend class GlobalTrajectoryFilter;
-    void  init();
+
+    // Initialize the global vertex manager
+    // - Create the surface mesh
+    // - Setup surface attributes
+    void init();
+
+    // Update the surface attributes
+    void update_attributes();
+
     void  rebuild();
     void  record_prev_positions();
     void  collect_vertex_displacements();
@@ -205,6 +239,9 @@ class GlobalVertexManager final : public SimSystem
     AABB compute_vertex_bounding_box();
     void step_forward(Float alpha);
     void record_start_point();
+
+    friend class VertexReporter;
+    void add_reporter(VertexReporter* reporter);
     Impl m_impl;
 };
 }  // namespace uipc::backend::cuda

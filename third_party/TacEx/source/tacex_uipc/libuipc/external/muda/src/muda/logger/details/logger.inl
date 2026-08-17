@@ -193,13 +193,13 @@ MUDA_INLINE void Logger::upload()
     m_h_offset = {};
     m_offset   = {m_h_offset};
 
-    m_viewer.m_offset       = m_offset.data();
+    m_viewer.m_offset            = m_offset.data();
     m_viewer.m_meta_data_id      = m_meta_data_id.data();
-    m_viewer.m_meta_data_id_size = m_meta_data_id.size();
+    m_viewer.m_meta_data_id_size = static_cast<int>(m_meta_data_id.size());
     m_viewer.m_meta_data         = m_meta_data.data();
-    m_viewer.m_meta_data_size    = m_meta_data.size();
+    m_viewer.m_meta_data_size    = static_cast<int>(m_meta_data.size());
     m_viewer.m_buffer            = m_buffer.data();
-    m_viewer.m_buffer_size       = m_buffer.size();
+    m_viewer.m_buffer_size       = static_cast<int>(m_buffer.size());
 
     if(m_log_viewer_ptr)
     {
