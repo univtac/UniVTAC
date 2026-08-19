@@ -80,11 +80,11 @@ class Task(BaseTask):
         self.delay(20, is_save=False)
 
     def check_early_stop(self):
-        min_depth = torch.min(self._tactile_manager.get_min_depth()).item()
+        max_press_depth = torch.max(self._tactile_manager.get_press_depth()).item()
         
-        if min_depth < 20:
+        if max_press_depth > SAFE_PRESS_DEPTH_LIMIT_MM[self.cfg.tactile_sensor_type]:
             self.metadata['early_stop'] = True
-            self.metadata['min_depth'] = float(min_depth)
+            self.metadata['max_press_depth'] = float(max_press_depth)
             return True
         return False
 

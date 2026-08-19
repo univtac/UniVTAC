@@ -193,7 +193,7 @@ Common `self.move` parameters:
 - `delay`: Whether to automatically delay several steps after each action.
 - `constraint_pose`: Constraint mask passed to the motion planner, for example to restrict specific degrees of freedom. A common value `[1, 1, 1, 0, 0, 0]` constrains rotation and only plans translation. `[1, 1, 1, 1, 1, 0]` only allows the gripper to move along its local z axis, which is the gripper approach direction, and is often used for insertion tasks. The stricter the constraint, the more likely planning is to fail.
 - `time_dilation_factor`: Adjust the execution speed of the planned action.
-- `gripper_depth_threshold`: Override the tactile depth threshold used by adaptive grasping.
+- `gripper_press_depth_threshold`: Override the positive tactile indentation threshold (in mm) used by adaptive grasping. `0` means first contact and larger values mean a deeper press. This is not an absolute camera-plane distance.
 
 If `self.move` planning fails, `self.plan_success` is set to `False`, and later actions stop executing.
 

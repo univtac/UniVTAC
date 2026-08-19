@@ -14,6 +14,15 @@ from isaaclab.utils import configclass
 from isaaclab.assets import ArticulationCfg
 from ..sensors.tactile import TactileCfg, create_tactile_cfg
 
+
+# Positive indentation limits used by task-level safety checks.  These are
+# press depths in millimetres, never distances from the tactile camera.
+SAFE_PRESS_DEPTH_LIMIT_MM = {
+    "gsmini": 8.0,
+    "gf225": 7.0,
+    "xensews": 5.0,
+}
+
 @configclass
 class RobotCfg:
     robot: ArticulationCfg = None
@@ -22,9 +31,9 @@ class RobotCfg:
     gripper_offset: float = 0.131 # in m
     gripper_max_qpos: float = 0.039 # in m
 
-    tactile_far_plane: float = 30.0 # in mm
-    adaptive_grasp_depth_threshold: float = 27.5 # in mm, used for grasping
-    contact_threshold: tuple[float, float] = (27.5, 28.0) # in mm, used in `gravity_rotate` api
+    tactile_far_plane: float = 30.0 # raw camera far plane; proximity only, in mm
+    adaptive_grasp_depth_threshold: float = 0.5 # positive press depth in mm
+    contact_threshold: tuple[float, float] = (0.1, 0.5) # positive press-depth hysteresis band in mm
 
 def create_franka_gsmini_gripper(
     data_type: list[str], optical_backend: Literal["taxim", "pix2pix"] = "taxim"
@@ -70,8 +79,8 @@ def create_franka_gsmini_gripper(
         gripper_offset=0.131,
         gripper_max_qpos=0.039,
         tactile_far_plane=34.0,
-        adaptive_grasp_depth_threshold=27.5,
-        contact_threshold=(27.5, 28.0)
+        adaptive_grasp_depth_threshold=0.5,
+        contact_threshold=(0.1, 0.5),
     )
 
 def create_franka_gf225_gripper(data_type:list[str]):
@@ -114,8 +123,8 @@ def create_franka_gf225_gripper(data_type:list[str]):
         gripper_offset=0.131,
         gripper_max_qpos=0.039,
         tactile_far_plane=29.0,
-        adaptive_grasp_depth_threshold=26.8,
-        contact_threshold=(26.5, 27.0)
+        adaptive_grasp_depth_threshold=0.2,
+        contact_threshold=(0.1, 0.5),
     )
 
 def create_franka_xensews_gripper(data_type:list[str]):
@@ -158,6 +167,6 @@ def create_franka_xensews_gripper(data_type:list[str]):
         gripper_offset=0.125,
         gripper_max_qpos=0.039,
         tactile_far_plane=30.0,
-        adaptive_grasp_depth_threshold=24.8,
-        contact_threshold=(24.5, 25.0)
+        adaptive_grasp_depth_threshold=0.2,
+        contact_threshold=(0.1, 0.5),
     )

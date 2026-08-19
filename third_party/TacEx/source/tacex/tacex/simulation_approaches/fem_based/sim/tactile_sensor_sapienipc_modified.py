@@ -26,6 +26,7 @@ import torch
 
 import usdrt
 import usdrt.UsdGeom
+from pxr import UsdGeom
 from scipy.spatial import Delaunay
 
 import isaaclab.utils.math as math_utils
@@ -88,12 +89,12 @@ class VisionTactileSensorUIPC:
         self.scene = self.uipc_sim.scene
 
         self.camera = camera
-        # The camera prim stays authored inside the GelSight USD.  In Isaac Sim
-        # 5.1, CameraData's XForm pose can remain at its authored value while a
-        # parent articulation moves in PhysX/Fabric.  The moving camera pose is
-        # reconstructed below from the rigid motion of the UIPC attachment
-        # vertices. Those vertices are the actual PhysX-to-UIPC coupling and
-        # therefore share the same world frame as the FEM marker vertices.
+        # CameraData's world XForm can stay at its authored value while the
+        # parent articulation moves in PhysX/Fabric.  Cache only the stable USD
+        # camera-to-case transform here; the live world pose is reconstructed
+        # from the rigid attachment body's aim positions below.
+        self._camera_pose_in_attachment_body_authored = self._get_camera_pose_in_attachment_body()
+        self._camera_pose_in_attachment_body = self._camera_pose_in_attachment_body_authored.clone()
 
         if self.sensor_type not in CONSTRAIN_PTS:        
             gelpad_info = get_gelpad_info(self.gelpad_obj.uipc_meshes[0])
@@ -102,7 +103,6 @@ class VisionTactileSensorUIPC:
         else:
             self.constrain_ids = CONSTRAIN_PTS[self.sensor_type]
             self.faces_on_surfaces = SURFACE_FACES[self.sensor_type]
-        self._attachment_points_initial_w = self.get_vertices_world()[self.constrain_ids].clone()
         self._camera_initial_pos_w, self._camera_initial_quat_w = self._authored_camera_pose_w()
         self.vertices_on_surface = np.sort(np.unique(self.faces_on_surfaces.flatten()))
         self.init_surface_vertices = self.get_surface_vertices_world()
@@ -137,14 +137,54 @@ class VisionTactileSensorUIPC:
         self.camera_distort_coeffs = np.array([0, 0, 0, 0, 0], dtype=np.float32)
 
         self.marker_grid = self._gen_marker_grid()
+        self._reference_calibrated = False
         self.init_vertices()
         # self.phong_shading_renderer = PhongShadingRenderer()
     
     def init_vertices(self):
+        """Create a provisional marker reference.
+
+        Task reset replaces this with a calibrated reference after the UIPC
+        attachment has settled.  Keeping a provisional reference makes sensor
+        output well-defined during Isaac Lab's initialization callbacks.
+        """
         self.init_surface_vertices_camera = self.get_surface_vertices_camera().clone()
-        self.reference_surface_vertices_camera = self.get_surface_vertices_camera().clone()
+        self.reference_surface_vertices_camera = self.init_surface_vertices_camera.clone()
         self.marker_surf_idx, self.marker_weight = self._gen_marker_weight(self.marker_grid)
-        self.constrain_pts = self.get_vertices_camera()[self.constrain_ids].cpu().numpy()
+
+    @staticmethod
+    def _pxr_matrix_to_torch(matrix, *, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+        # Gf.Matrix4d follows row-vector convention; Isaac Lab pose matrices use
+        # column vectors, hence the transpose.
+        values = np.asarray(
+            [[matrix[row][col] for col in range(4)] for row in range(4)],
+            dtype=np.float64,
+        ).T.copy()
+        return torch.tensor(values, device=device, dtype=dtype)
+
+    def _get_camera_pose_in_attachment_body(self) -> torch.Tensor:
+        """Return the fixed attachment-body-to-ROS-camera transform from USD."""
+        camera_prim = self.camera._sensor_prims[0].GetPrim()
+        attachment_body_prim = camera_prim.GetParent()
+        xform_cache = UsdGeom.XformCache()
+        camera_world_opengl = self._pxr_matrix_to_torch(
+            xform_cache.GetLocalToWorldTransform(camera_prim),
+            device=self.get_vertices_world().device,
+            dtype=self.get_vertices_world().dtype,
+        )
+        body_world = self._pxr_matrix_to_torch(
+            xform_cache.GetLocalToWorldTransform(attachment_body_prim),
+            device=camera_world_opengl.device,
+            dtype=camera_world_opengl.dtype,
+        )
+        camera_in_body = torch.linalg.inv(body_world) @ camera_world_opengl
+
+        # USD cameras use OpenGL axes (+X right, +Y up, -Z forward), while the
+        # marker projection uses ROS/OpenCV axes (+X right, +Y down, +Z forward).
+        opengl_from_ros = torch.eye(4, device=camera_in_body.device, dtype=camera_in_body.dtype)
+        opengl_from_ros[1, 1] = -1
+        opengl_from_ros[2, 2] = -1
+        return camera_in_body @ opengl_from_ros
 
     def get_vertices_world(self):
         v = self.gelpad_obj._data.nodal_pos_w
@@ -185,19 +225,101 @@ class VisionTactileSensorUIPC:
         return math_utils.make_pose(translation, rotation)
 
     def get_camera_pose_world(self) -> tuple[torch.Tensor, torch.Tensor]:
-        """Compute the live ROS/OpenCV camera pose from attachment-point motion."""
-        current_attachment_points_w = self.get_vertices_world()[self.constrain_ids]
-        attachment_motion = self._estimate_rigid_motion(
-            self._attachment_points_initial_w,
-            current_attachment_points_w,
+        """Compute the live ROS/OpenCV camera pose from the rigid sensor case."""
+        # PhysX articulation tensor access is not safe inside the sensor's PLAY
+        # initialization callback.  The authored pose is only provisional and
+        # is replaced during the explicit post-reset stable calibration.
+        if not self._reference_calibrated:
+            return self._camera_initial_pos_w.clone(), self._camera_initial_quat_w.clone()
+
+        attachment = self.gelpad_obj.constraint
+        attachment_points_body = torch.as_tensor(
+            attachment.attachment_offsets,
+            device=self.get_vertices_world().device,
+            dtype=self.get_vertices_world().dtype,
         )
-        camera_initial_pose = math_utils.make_pose(
-            self._camera_initial_pos_w.to(dtype=attachment_motion.dtype),
-            math_utils.matrix_from_quat(self._camera_initial_quat_w).to(dtype=attachment_motion.dtype),
+        attachment_aim_positions_w = torch.as_tensor(
+            attachment.aim_positions,
+            device=attachment_points_body.device,
+            dtype=attachment_points_body.dtype,
         )
-        camera_pose_w = attachment_motion.unsqueeze(0) @ camera_initial_pose
+        attachment_body_pose_w = self._estimate_rigid_motion(
+            attachment_points_body,
+            attachment_aim_positions_w,
+        )
+        camera_pose_w = (
+            attachment_body_pose_w @ self._camera_pose_in_attachment_body
+        ).unsqueeze(0)
         camera_pos_w, camera_rotation_w = math_utils.unmake_pose(camera_pose_w)
         return camera_pos_w, math_utils.quat_from_matrix(camera_rotation_w)
+
+    def attachment_error(self) -> float:
+        """Return the maximum constrained-vertex error relative to the rigid case."""
+        attachment = self.gelpad_obj.constraint
+        current = self.get_vertices_world()[self.constrain_ids]
+        aim = torch.as_tensor(
+            attachment.aim_positions,
+            device=current.device,
+            dtype=current.dtype,
+        )
+        return torch.linalg.vector_norm(current - aim, dim=1).max().item()
+
+    def calibrate_reference(self) -> dict[str, float | list[float]]:
+        """Calibrate one stable marker reference without per-frame recentering."""
+        # Always start from the authored camera-to-case transform so repeated
+        # task resets cannot accumulate calibration offsets.
+        self._camera_pose_in_attachment_body = self._camera_pose_in_attachment_body_authored.clone()
+        self._reference_calibrated = True
+        surface_camera = self.get_surface_vertices_camera().clone()
+        self.init_surface_vertices_camera = surface_camera
+        self.marker_surf_idx, self.marker_weight = self._gen_marker_weight(self.marker_grid)
+
+        marker_points = (
+            surface_camera[self.marker_surf_idx].cpu().numpy()
+            * self.marker_weight[..., None]
+        ).sum(1)
+        inverse_depth = 1.0 / marker_points[:, 2]
+        optical_axis_offset = np.array(
+            [
+                np.sum(marker_points[:, 0] * inverse_depth) / np.sum(inverse_depth),
+                np.sum(marker_points[:, 1] * inverse_depth) / np.sum(inverse_depth),
+                0.0,
+            ],
+            dtype=np.float64,
+        )
+
+        # Move the camera origin once in its own XY plane.  This bakes the
+        # stable-state centering into the fixed extrinsic; subsequent marker
+        # motion is never recentered and therefore keeps real contact motion.
+        offset_camera = torch.as_tensor(
+            optical_axis_offset,
+            device=self._camera_pose_in_attachment_body.device,
+            dtype=self._camera_pose_in_attachment_body.dtype,
+        )
+        self._camera_pose_in_attachment_body[:3, 3] += (
+            self._camera_pose_in_attachment_body[:3, :3] @ offset_camera
+        )
+
+        self.init_surface_vertices_camera = self.get_surface_vertices_camera().clone()
+        self.reference_surface_vertices_camera = self.init_surface_vertices_camera.clone()
+        self.marker_surf_idx, self.marker_weight = self._gen_marker_weight(self.marker_grid)
+
+        calibrated_marker_points = (
+            self.reference_surface_vertices_camera[self.marker_surf_idx].cpu().numpy()
+            * self.marker_weight[..., None]
+        ).sum(1)
+        calibrated_center_uv = self.gen_marker_uv(calibrated_marker_points).mean(axis=0)
+        optical_center_uv = self.camera_intrinsic[:2, 2]
+        if not np.allclose(calibrated_center_uv, optical_center_uv, atol=1e-5):
+            raise RuntimeError(
+                "Stable marker calibration did not align with the optical center: "
+                f"marker={calibrated_center_uv}, optical={optical_center_uv}"
+            )
+        return {
+            "attachment_error_m": self.attachment_error(),
+            "camera_xy_offset_m": optical_axis_offset[:2].tolist(),
+            "marker_center_uv": calibrated_center_uv.tolist(),
+        }
 
     # todo find out what's wrong with this method -> frame coor. sys. seems to be wrong
     def transform_camera_to_world_frame(self, input_vertices):
@@ -384,13 +506,6 @@ class VisionTactileSensorUIPC:
             self.get_surface_vertices_camera(camera_pose_w=camera_pose_w)[self.marker_surf_idx].cpu().numpy()
             * self.marker_weight[..., None]
         ).sum(1)
-
-        mean_motion = np.mean(
-            self.get_vertices_camera(camera_pose_w=camera_pose_w)[self.constrain_ids].cpu().numpy()
-            - self.constrain_pts,
-            axis=0,
-        )
-        curr_marker_pts[:, :2] -= mean_motion[:2]
 
         init_marker_uv = self.gen_marker_uv(init_marker_pts)
         curr_marker_uv = self.gen_marker_uv(curr_marker_pts)

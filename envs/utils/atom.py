@@ -308,16 +308,29 @@ class Atom:
     ):
         return [Action("move", target_pose=target_pose)]
     
-    def close_gripper(self, pos: float = 0.0, depth_threshold:Literal['auto']|float='auto'):
-        if depth_threshold == 'auto':
-            if self.task.cfg.use_adaptive_grasp:
-                depth_threshold = self.task.cfg.adaptive_grasp_depth_threshold
-            else:
-                depth_threshold = None
-        return [Action("close", target_gripper_pos=pos, gripper_depth_threshold=depth_threshold)]
+    def close_gripper(self, pos: float = 0.0, press_depth_threshold:Literal['auto']|float='auto'):
+        """Close until the requested positive indentation depth is reached.
 
-    def open_gripper(self, pos: float = 1.0, depth_threshold: float = None):
-        return [Action("open", target_gripper_pos=pos, gripper_depth_threshold=depth_threshold)]
+        ``press_depth_threshold`` is measured in millimetres from first gel
+        contact.  It is never an absolute distance from the tactile camera.
+        """
+        if press_depth_threshold == 'auto':
+            if self.task.cfg.use_adaptive_grasp:
+                press_depth_threshold = self.task.cfg.adaptive_grasp_depth_threshold
+            else:
+                press_depth_threshold = None
+        return [Action(
+            "close",
+            target_gripper_pos=pos,
+            gripper_press_depth_threshold=press_depth_threshold,
+        )]
+
+    def open_gripper(self, pos: float = 1.0, press_depth_threshold: float = None):
+        return [Action(
+            "open",
+            target_gripper_pos=pos,
+            gripper_press_depth_threshold=press_depth_threshold,
+        )]
 
     def back_to_origin(self):
         return [Action("move", target_pose=self.robot.origin_pose)]

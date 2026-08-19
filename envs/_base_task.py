@@ -152,7 +152,7 @@ class BaseTaskCfg(DirectRLEnvCfg):
     )
 
     use_adaptive_grasp: bool = True
-    adaptive_grasp_depth_threshold = None # in mm
+    adaptive_grasp_depth_threshold = None # positive press depth in mm
     reset_time_limit: float = 120.0  # in seconds
 
     cameras: list[CameraCfg] = [
@@ -263,6 +263,17 @@ class BaseTask(UipcRLEnv):
         elif isinstance(cfg.adaptive_grasp_depth_threshold, dict):
             cfg.adaptive_grasp_depth_threshold = cfg.adaptive_grasp_depth_threshold.get(
                 cfg.tactile_sensor_type, cfg.robot.adaptive_grasp_depth_threshold)
+
+        press_depth_threshold = float(cfg.adaptive_grasp_depth_threshold)
+        safe_limit = SAFE_PRESS_DEPTH_LIMIT_MM[cfg.tactile_sensor_type]
+        if not 0.0 <= press_depth_threshold <= safe_limit:
+            raise ValueError(
+                "adaptive_grasp_depth_threshold is a positive gel indentation "
+                f"in millimetres and must be in [0, {safe_limit}], got "
+                f"{press_depth_threshold}. Legacy camera-plane values such as "
+                "27 mm are no longer accepted."
+            )
+        cfg.adaptive_grasp_depth_threshold = press_depth_threshold
         return cfg
  
     def _setup_save(self):
@@ -421,6 +432,7 @@ class BaseTask(UipcRLEnv):
                 )
         self._update_render()
 
+        self._stabilize_and_calibrate_marker_references()
         self.pre_move()
         self.in_pre_move = False
 
@@ -435,6 +447,44 @@ class BaseTask(UipcRLEnv):
         self.atom_tag = ''
 
         return ret
+
+    def _stabilize_and_calibrate_marker_references(
+        self,
+        max_attachment_error: float = 5e-4,
+        stable_updates: int = 3,
+        max_steps: int = 60,
+    ):
+        """Calibrate marker references once the gel-to-case attachment is stable."""
+        stable_count = 0
+        errors = self._tactile_manager.get_marker_attachment_errors()
+        for _ in range(max_steps + 1):
+            if not errors or max(errors.values()) <= max_attachment_error:
+                stable_count += 1
+                if stable_count >= stable_updates:
+                    break
+            else:
+                stable_count = 0
+
+            if time.perf_counter() - self.start_time > self.cfg.reset_time_limit:
+                raise RuntimeError(
+                    "Timeout while waiting for tactile marker attachments to stabilize: "
+                    f"errors={errors}"
+                )
+            self._step(is_save=False)
+            self._update_render()
+            errors = self._tactile_manager.get_marker_attachment_errors()
+        else:
+            raise RuntimeError(
+                "Tactile marker attachments did not stabilize before calibration: "
+                f"threshold={max_attachment_error}, errors={errors}"
+            )
+
+        reports = self._tactile_manager.calibrate_marker_references()
+        self.metadata['marker_calibration'] = reports
+        # Refresh the sensor output using the newly frozen reference before any
+        # task-specific pre-move or contact starts.
+        self._update_render()
+        return reports
 
     # def _reset_actors(self):
     #     pass
@@ -690,7 +740,7 @@ class BaseTask(UipcRLEnv):
         delay: bool = True,
         constraint_pose = None,
         time_dilation_factor = None,
-        gripper_depth_threshold = None
+        gripper_press_depth_threshold = None
     ):
         """
         Take action for the robot.
@@ -736,7 +786,10 @@ class BaseTask(UipcRLEnv):
                             'status': 'success',
                             'num_steps': -1,
                             'target': target_pos,
-                            'threshold': action.args.get('gripper_depth_threshold', gripper_depth_threshold)
+                            'threshold': action.args.get(
+                                'gripper_press_depth_threshold',
+                                gripper_press_depth_threshold,
+                            )
                         }
                     else:
                         control_seq['gripper'] = self._robot_manager.plan_gripper(
@@ -855,60 +908,136 @@ class BaseTask(UipcRLEnv):
 
         return exec_success, self.eval_success
 
-    def adaptive_set_gripper(self, qpos, depth_threshold:float=None):
+    def adaptive_set_gripper(self, qpos, press_depth_threshold:float=None):
         max_steps = 1000
         default_step, contact_step = 0.0005, 0.00005
-        last_qpos = self._robot_manager.get_gripper_qpos()
-        max_depth = self.cfg.robot.tactile_far_plane \
-            * torch.ones_like(self._tactile_manager.get_min_depth()) # mm
-        if depth_threshold is not None:
-            depth_threshold = depth_threshold * torch.ones_like(max_depth)
-        direct = 'open' if self._robot_manager.get_gripper_qpos() < qpos else 'close'
+        target_qpos = torch.full(
+            (len(self._robot_manager._gripper_ids),),
+            float(qpos),
+            dtype=torch.float32,
+            device=self._robot_manager.device,
+        )
+        last_qpos = self._robot_manager.get_gripper_qpos_all()
+        target_press_depth = press_depth_threshold
+        if press_depth_threshold is not None:
+            safe_limit = SAFE_PRESS_DEPTH_LIMIT_MM[self.cfg.tactile_sensor_type]
+            if not 0.0 <= float(press_depth_threshold) <= safe_limit:
+                raise ValueError(
+                    "press_depth_threshold must be positive gel indentation "
+                    f"in [0, {safe_limit}] mm, got {press_depth_threshold}"
+                )
+            press_depth_threshold = (
+                press_depth_threshold
+                * torch.ones_like(self._tactile_manager.get_press_depth())
+            )
+        use_gel_indentation = self._tactile_manager.has_relative_gel_height_maps()
+        camera_depth_threshold = None
+        if press_depth_threshold is not None and not use_gel_indentation:
+            camera_depth_threshold = (
+                self._tactile_manager.get_nominal_gel_surface_camera_depths()
+                - press_depth_threshold
+            )
+
+        direct = 'open' if last_qpos.mean().item() < qpos else 'close'
+        slow_mode_entry = None
+        stop_reason = 'max_steps'
 
         step_size = contact_step if direct == 'open' else -default_step
         for i in range(max_steps):
-            current_qpos = self._robot_manager.get_gripper_qpos()
-            tactile_depth = self._tactile_manager.get_min_depth()
+            current_qpos = self._robot_manager.get_gripper_qpos_all()
+            press_depth, min_camera_depth, far_plane_depth = (
+                self._tactile_manager.get_grasp_control_depths()
+            )
+            near_geometry = not torch.allclose(
+                min_camera_depth,
+                far_plane_depth,
+                atol=1e-5,
+            )
+
+            depth_target_reached = False
+            depth_error = None
+            if press_depth_threshold is not None:
+                if use_gel_indentation:
+                    depth_target_reached = bool(
+                        torch.all(press_depth >= press_depth_threshold).item()
+                    )
+                    depth_error = torch.abs(press_depth - press_depth_threshold)
+                else:
+                    # Compatibility path for the old TacEx height-map contract:
+                    # camera depth decreases as the object approaches/presses.
+                    depth_target_reached = bool(
+                        torch.all(min_camera_depth <= camera_depth_threshold).item()
+                    )
+                    depth_error = torch.abs(min_camera_depth - camera_depth_threshold)
 
             if direct == 'close':
-                if torch.allclose(max_depth, tactile_depth, atol=1e-5):
+                if not near_geometry:
                     step_size = -default_step
-                elif depth_threshold is not None:
-                    if torch.all(tactile_depth < depth_threshold):
+                elif press_depth_threshold is not None:
+                    if depth_target_reached:
+                        stop_reason = 'depth_target_reached'
                         break
-                    else:
-                        step_size = - min(
-                            torch.min(torch.abs(tactile_depth - depth_threshold)).item()/1000,
-                            contact_step
-                        )
+                    # This is the migrated equivalent of the old 27.x mm
+                    # camera-depth controller: run fast while both cameras see
+                    # only their far plane, then approach the target slowly.
+                    min_depth_error_m = torch.min(depth_error).item() / 1000.0
+                    step_size = -min(max(min_depth_error_m, 1e-6), contact_step)
                 else:
                     step_size = -default_step
+
+                if near_geometry and slow_mode_entry is None:
+                    slow_mode_entry = {
+                        'gripper_qpos': current_qpos.tolist(),
+                        'min_camera_depth': min_camera_depth.tolist(),
+                        'press_depth': press_depth.tolist(),
+                    }
             else:
-                if torch.allclose(max_depth, tactile_depth, atol=1e-5):
-                    step_size = default_step
-                if depth_threshold is not None:
-                    if torch.all(tactile_depth > depth_threshold):
-                        break
-                    else:
-                        step_size = min(
-                            torch.min(torch.abs(depth_threshold - tactile_depth)).item()/1000,
-                            contact_step
+                if press_depth_threshold is not None:
+                    if use_gel_indentation:
+                        release_target_reached = bool(
+                            torch.all(press_depth <= press_depth_threshold).item()
                         )
+                    else:
+                        release_target_reached = bool(
+                            torch.all(min_camera_depth >= camera_depth_threshold).item()
+                        )
+                    if release_target_reached:
+                        stop_reason = 'depth_target_reached'
+                        break
+                    min_depth_error_m = torch.min(depth_error).item() / 1000.0
+                    step_size = min(max(min_depth_error_m, 1e-6), contact_step)
                 else:
                     step_size = default_step
 
-            if np.allclose(current_qpos, qpos, atol=1e-5):
+            if torch.allclose(current_qpos, target_qpos, atol=1e-5, rtol=0.0):
+                stop_reason = (
+                    'position_limit_before_depth_target'
+                    if press_depth_threshold is not None and not depth_target_reached
+                    else 'position_target_reached'
+                )
                 break
-            elif np.abs(current_qpos - qpos) < np.abs(step_size):
-                target_qpos = qpos
+
+            if direct == 'close':
+                position = torch.maximum(current_qpos + step_size, target_qpos)
             else:
-                target_qpos = current_qpos + step_size
-            position = torch.tensor([target_qpos, target_qpos], device=self._robot_manager.device)
+                position = torch.minimum(current_qpos + step_size, target_qpos)
             velocity = (position - current_qpos)/self.cfg.sim.dt
-            last_qpos = current_qpos
+            last_qpos = current_qpos.clone()
             yield position, velocity, True
 
-        final_position = torch.tensor([last_qpos, last_qpos], device=self._robot_manager.device)
+        final_press_depth = self._tactile_manager.get_press_depth()
+        final_qpos = self._robot_manager.get_gripper_qpos_all()
+        self.metadata.setdefault('adaptive_grasp', []).append({
+            'direction': direct,
+            'depth_signal': 'gel_indentation' if use_gel_indentation else 'camera_depth',
+            'target_press_depth': None if target_press_depth is None else float(target_press_depth),
+            'final_press_depth': final_press_depth.tolist(),
+            'final_gripper_qpos': float(final_qpos.mean().item()),
+            'final_gripper_qpos_per_finger': final_qpos.tolist(),
+            'stop_reason': stop_reason,
+            'slow_mode_entry': slow_mode_entry,
+        })
+        final_position = final_qpos
         yield final_position, torch.zeros_like(final_position), False
 
     def gravity_rotate(self, actor:Actor, target_vec, target_axis=[0, 0, 1], is_save=True):
@@ -917,7 +1046,7 @@ class BaseTask(UipcRLEnv):
         
         max_steps = 200
         omega_threshold = 0.05
-        contact_threshold = self.cfg.robot.contact_threshold # [min, max]
+        min_press_depth, max_press_depth = self.cfg.robot.contact_threshold
         target_axis = np.array(target_axis).reshape(3, 1)
 
         def get_axis():
@@ -932,7 +1061,7 @@ class BaseTask(UipcRLEnv):
         for _ in range(max_steps):
             curr_z = get_axis()
             curr_qpos = self._robot_manager.get_gripper_qpos()
-            curr_depth = torch.min(self._tactile_manager.get_min_depth()).item()
+            curr_press_depth = torch.min(self._tactile_manager.get_press_depth()).item()
 
             theta = np.arccos(np.dot(curr_z, target_vec))
             if theta < 0.05 or theta > last_theta:
@@ -941,9 +1070,14 @@ class BaseTask(UipcRLEnv):
             last_theta = theta
 
             if np.abs(omega) < omega_threshold:
-                if curr_depth < contact_threshold[1]:
+                # The object has stopped rotating: release only when both
+                # tactile pads are pressed beyond the upper hysteresis bound.
+                if curr_press_depth > max_press_depth:
                     curr_qpos += 0.0001
-            elif curr_depth > contact_threshold[0]:
+            # While it is rotating, tighten only after the minimum press depth
+            # has fallen below the lower bound.  Both comparisons are positive
+            # gel indentation values, never camera-plane distances.
+            elif curr_press_depth < min_press_depth:
                 curr_qpos -= 0.0001
 
             position = torch.tensor([curr_qpos, curr_qpos],

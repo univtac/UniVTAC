@@ -341,14 +341,24 @@ class VisualTactileSensor:
     def get_observations(self, data_types: list[str] = None):
         obs = {}
         if data_types is None:
-            data_types = ['rgb', 'rgb_marker', 'depth', 'points', 'pose', 'flow']
+            data_types = ['rgb', 'rgb_marker', 'depth', 'press_depth', 'points', 'pose', 'flow']
         for data_type in data_types:
             if data_type == 'rgb':
                 obs['rgb'] = self.sensor.data.output['tactile_rgb'].squeeze(0)
             elif data_type == 'rgb_marker':
                 obs['rgb_marker'] = self.sensor.data.output['marker_rgb'].squeeze(0)
             elif data_type == 'depth':
-                obs['depth'] = self.sensor.data.output['height_map'].squeeze(0)
+                # Legacy UniVTAC depth: raw sensor-camera distance in millimetres.
+                camera_depth = self.sensor.camera.data.output['depth'][0, :, :, 0].clone()
+                far_plane = self.sensor.cfg.sensor_camera_cfg.clipping_range[1]
+                camera_depth = torch.nan_to_num(
+                    camera_depth, nan=far_plane, posinf=far_plane, neginf=far_plane
+                )
+                obs['depth'] = camera_depth * 1000.0
+                # Requesting legacy depth always records the new semantics too.
+                obs['press_depth'] = self.get_press_depth_map()
+            elif data_type == 'press_depth':
+                obs['press_depth'] = self.get_press_depth_map()
             elif data_type == 'marker':
                 obs['marker'] = self.sensor.data.output['marker_motion'].squeeze(0)
             elif data_type == 'points':
@@ -360,9 +370,70 @@ class VisualTactileSensor:
     def _reset_idx(self):
         self.init_pose_mat = self.get_attach_pose().to_transformation_matrix()
         # self.gelpad.write_vertex_positions_to_sim(vertex_positions=self.gelpad.init_vertex_pos)
+
+    def get_marker_attachment_error(self) -> float | None:
+        marker_simulator = self.sensor.marker_motion_simulator
+        if marker_simulator is None or not hasattr(marker_simulator, 'marker_motion_sim'):
+            return None
+        return marker_simulator.marker_motion_sim.attachment_error()
+
+    def calibrate_marker_reference(self) -> dict | None:
+        marker_simulator = self.sensor.marker_motion_simulator
+        if marker_simulator is None or not hasattr(marker_simulator, 'marker_motion_sim'):
+            return None
+        return marker_simulator.marker_motion_sim.calibrate_reference()
     
-    def get_min_depth(self):
-        return torch.min(self.sensor.data.output['height_map']).item()
+    def get_press_depth_map(self):
+        """Return positive gel indentation in millimetres (zero means no press)."""
+        return (-self.sensor.data.output['height_map'].squeeze(0)).clamp_min(0.0)
+
+    def get_press_depth(self):
+        """Return the maximum positive indentation in millimetres."""
+        return max(0.0, self.sensor.indentation_depth.squeeze().item())
+
+    def get_min_camera_depth(self) -> tuple[float, float]:
+        """Return nearest visible geometry and the far plane in millimetres.
+
+        Raw camera distance is deliberately kept separate from press depth.  It
+        is only a proximity signal for switching the gripper to its slow mode;
+        contact targets and stopping conditions must use ``get_press_depth``.
+        """
+        far_plane_m = self.sensor.cfg.sensor_camera_cfg.clipping_range[1]
+        camera_depth = self.sensor.camera.data.output['depth'][0, :, :, 0]
+        camera_depth = torch.nan_to_num(
+            camera_depth,
+            nan=far_plane_m,
+            posinf=far_plane_m,
+            neginf=far_plane_m,
+        ).clamp(max=far_plane_m)
+        return camera_depth.amin().item() * 1000.0, far_plane_m * 1000.0
+
+    def has_relative_gel_height_map(self) -> bool:
+        """Whether ``height_map`` is expressed relative to the gel surface.
+
+        The migrated TacEx representation is zero without indentation and
+        negative below the nominal gel surface.  Older TacEx versions exposed
+        positive absolute camera distance instead.  Detecting the contract at
+        the sensor boundary keeps adaptive grasp compatible with both forms.
+        """
+        height_map = self.sensor.data.output['height_map']
+        gel_height_mm = self.sensor.cfg.gelpad_dimensions.height * 1000.0
+        finite = height_map[torch.isfinite(height_map)]
+        if finite.numel() == 0:
+            return False
+        tolerance_mm = 1e-3
+        return bool(
+            finite.amax().item() <= tolerance_mm
+            and finite.amin().item() >= -gel_height_mm - tolerance_mm
+        )
+
+    def get_nominal_gel_surface_camera_depth(self) -> float:
+        """Return nominal camera-to-gel-surface distance in millimetres."""
+        camera_cfg = self.sensor.cfg.sensor_camera_cfg
+        return (
+            camera_cfg.clipping_range[0]
+            + self.sensor.cfg.gelpad_dimensions.height
+        ) * 1000.0
 
 class TactileManager:
     def __init__(self, cfg_list: list[TactileCfg], task:'BaseTask'):
@@ -392,16 +463,72 @@ class TactileManager:
             obs[name] = tact.get_observations(data_types)
         return obs
 
-    def get_min_depth(self):
+    def get_press_depth(self):
+        """Return one positive indentation value per tactile sensor in millimetres."""
         self.task._update_render()
         depth = []
         for tact in self.tactiles.values():
-            depth.append(tact.get_min_depth())
+            depth.append(tact.get_press_depth())
         return torch.tensor(depth, dtype=torch.float32, device=self.task.device)
+
+    def get_grasp_control_depths(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Return press depth plus raw-camera proximity data for gripper control.
+
+        All tensors are one value per tactile sensor and use millimetres.
+        ``press_depth`` is the only quantity suitable for contact decisions.
+        ``min_camera_depth`` and ``far_plane_depth`` only decide whether nearby
+        geometry is visible and the gripper should therefore move slowly.
+        """
+        self.task._update_render()
+        press_depth = []
+        min_camera_depth = []
+        far_plane_depth = []
+        for tact in self.tactiles.values():
+            press_depth.append(tact.get_press_depth())
+            nearest, far_plane = tact.get_min_camera_depth()
+            min_camera_depth.append(nearest)
+            far_plane_depth.append(far_plane)
+        tensor_args = {'dtype': torch.float32, 'device': self.task.device}
+        return (
+            torch.tensor(press_depth, **tensor_args),
+            torch.tensor(min_camera_depth, **tensor_args),
+            torch.tensor(far_plane_depth, **tensor_args),
+        )
+
+    def has_relative_gel_height_maps(self) -> bool:
+        """Return true only when every tactile uses real gel-relative depth."""
+        return all(tact.has_relative_gel_height_map() for tact in self.tactiles.values())
+
+    def get_nominal_gel_surface_camera_depths(self) -> torch.Tensor:
+        """Return one nominal camera-to-gel distance per tactile sensor."""
+        return torch.tensor(
+            [
+                tact.get_nominal_gel_surface_camera_depth()
+                for tact in self.tactiles.values()
+            ],
+            dtype=torch.float32,
+            device=self.task.device,
+        )
 
     def _reset_idx(self):
         for tact in self.tactiles.values():
             tact._reset_idx()
+
+    def get_marker_attachment_errors(self) -> dict[str, float]:
+        errors = {}
+        for name, tactile in self.tactiles.items():
+            error = tactile.get_marker_attachment_error()
+            if error is not None:
+                errors[name] = error
+        return errors
+
+    def calibrate_marker_references(self) -> dict[str, dict]:
+        reports = {}
+        for name, tactile in self.tactiles.items():
+            report = tactile.calibrate_marker_reference()
+            if report is not None:
+                reports[name] = report
+        return reports
 
     def setup(self):
         for tact in self.tactiles.values():

@@ -16,6 +16,6 @@ optical_backend: taxim # taxim or pix2pix; selected before Isaac Sim starts
 
 observations:
   camera: ['rgb']
-  tactile: ['rgb', 'rgb_marker', 'marker', 'depth', 'pose']
+  tactile: ['rgb', 'rgb_marker', 'marker', 'depth', 'press_depth', 'pose']
   embodiment: ['joint', 'ee']
   actor: true

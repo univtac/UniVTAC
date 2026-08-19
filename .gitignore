@@ -33,3 +33,4 @@ policy/ACT_UniT
 /.env
 /.venv/
 /.cache/
+/.localrc.sh

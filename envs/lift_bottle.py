@@ -4,7 +4,8 @@ import numpy as np
 @configclass
 class TaskCfg(BaseTaskCfg):
     step_lim = 500
-    adaptive_grasp_depth_threshold = {'gsmini': 27.8, 'xensews': 25.1}
+    # Positive indentation target in millimetres.
+    adaptive_grasp_depth_threshold = {'gsmini': 0.2, 'xensews': 0.0}
 
 class Task(BaseTask):
     def __init__(self, cfg: BaseTaskCfg, mode:Literal['collect', 'eval'] = 'collect', render_mode: str|None = None, **kwargs):

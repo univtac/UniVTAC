@@ -87,15 +87,19 @@ class UipcObject(AssetBase):
         self._prim_view = XFormPrim(prim_paths_expr=prim_paths_expr, name=f"{prim_paths_expr}", usd=False)
         self._prim_view.initialize()
 
-        # check if prim of uipc_object has PhysX rigid body API applied to it
-        if UsdPhysics.RigidBodyAPI(self._prim_view.prims[0]):
-            # if yes disable it, otherwise render errors
-            UsdPhysics.RigidBodyAPI(self._prim_view.prims[0]).GetRigidBodyEnabledAttr().Set(False)
-
-            # disable collisions
-            for prim_child in self._prim_view.prims[0].GetChildren():  # todo properly deal with multiple meshs
-                if UsdPhysics.CollisionAPI(prim_child):
-                    UsdPhysics.CollisionAPI(prim_child).GetCollisionEnabledAttr().Set(False)
+        # A UIPC object must not remain active in PhysX as well.  Several task
+        # assets (for example Bottle.usd) put CollisionAPI on a descendant mesh
+        # without putting RigidBodyAPI on the root Xform.  The previous guard
+        # only inspected the root and therefore left a static, invisible PhysX
+        # collider behind while the rendered/UIPC object moved independently.
+        prim_stack = [self._prim_view.prims[0]]
+        while prim_stack:
+            prim = prim_stack.pop()
+            prim_stack.extend(prim.GetChildren())
+            if UsdPhysics.RigidBodyAPI(prim):
+                UsdPhysics.RigidBodyAPI(prim).GetRigidBodyEnabledAttr().Set(False)
+            if UsdPhysics.CollisionAPI(prim):
+                UsdPhysics.CollisionAPI(prim).GetCollisionEnabledAttr().Set(False)
 
         # the isaac mesh that should be used for creating the Tet mesh
         if self.cfg.usd_mesh_prim_name is not None:

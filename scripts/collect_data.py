@@ -81,7 +81,7 @@ task_config, task_config_file = get_config(
     type='yaml'
 )
 
-if task_config.get('render_frequency', 1) == 0:
+if task_config.get('render_frequency', 1) == 0 and not args_cli.headless:
     args_cli.livestream = 2
 
 # launch omniverse app, must done before importing anything from omni.isaac
@@ -186,6 +186,13 @@ def main():
     env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)
     env_cfg.video_frequency = task_config.get("video_frequency", env_cfg.video_frequency)
     env_cfg.render_frequency = task_config.get("render_frequency", env_cfg.render_frequency)
+    env_cfg.reset_time_limit = task_config.get("reset_time_limit", env_cfg.reset_time_limit)
+    for option_name, option_value in task_config.get("task_overrides", {}).items():
+        if not hasattr(env_cfg, option_name):
+            raise ValueError(
+                f"Unknown task override {option_name!r} for task {task_file_name!r}"
+            )
+        setattr(env_cfg, option_name, option_value)
     env_cfg.obs_data_type = task_config.get("observations", {})
     env_cfg.random_texture = task_config.get("random_texture", False)
 

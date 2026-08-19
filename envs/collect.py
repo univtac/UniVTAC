@@ -69,9 +69,9 @@ class Task(BaseTask):
 
         if self.cfg.tactile_sensor_type == 'gsmini':
             self.cfg.use_adaptive_grasp = True
-            self.cfg.adaptive_grasp_depth_threshold = self.rng.uniform(27.7, 28.1)
+            self.cfg.adaptive_grasp_depth_threshold = self.rng.uniform(0.0, 0.3)
             self.move(self.atom.close_gripper())
-            self.metadata['grasp_threshold'] = self._tactile_manager.get_min_depth().tolist()
+            self.metadata['grasp_press_depth'] = self._tactile_manager.get_press_depth().tolist()
         elif self.cfg.tactile_sensor_type == 'gf225':
             self.cfg.use_adaptive_grasp = False
             grasp_qpos = np.random.uniform(0.0118, 0.013) / self._robot_manager.gripper_max_qpos

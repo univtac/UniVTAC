@@ -72,14 +72,16 @@ Below is the structure of the saved observation data for each episode (stored in
     "step": "type: <class \"numpy.int64\">",
     "tactile": {
         "left_tactile": {
-            "depth": "np.ndarray(240, 320)",
+            "depth": "np.ndarray(240, 320), legacy raw camera distance in mm",
+            "press_depth": "np.ndarray(240, 320), positive indentation in mm",
             "marker": "np.ndarray(2, 63, 2)",
             "pose": "np.ndarray(7,)",
             "rgb": "np.ndarray(240, 320, 3)",
             "rgb_marker": "np.ndarray(240, 320, 3)"
         },
         "right_tactile": {
-            "depth": "np.ndarray(240, 320)",
+            "depth": "np.ndarray(240, 320), legacy raw camera distance in mm",
+            "press_depth": "np.ndarray(240, 320), positive indentation in mm",
             "marker": "np.ndarray(2, 63, 2)",
             "pose": "np.ndarray(7,)",
             "rgb": "np.ndarray(240, 320, 3)",
@@ -88,3 +90,8 @@ Below is the structure of the saved observation data for each episode (stored in
     }
 }
 ```
+
+Tactile control and Atom APIs use `press_depth`: `0` means no indentation and
+larger positive values mean a deeper press. The legacy `depth` field is kept in
+the dataset for compatibility with existing UniVTAC data. Requesting `depth`
+records both fields.

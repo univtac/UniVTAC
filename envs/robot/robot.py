@@ -121,11 +121,17 @@ class RobotManager:
 
     def get_qpos(self):
         return self.robot.data.joint_pos.clone().cpu()
-    
+
+    def get_gripper_qpos_all(self):
+        """Return the measured position of each gripper finger joint."""
+        return self.robot.data.joint_pos[0, self._gripper_ids].detach().clone()
+
     def get_gripper_qpos(self):
-        return self.get_qpos()[0, self._gripper_ids[0]].clone().cpu().item()
+        """Return the mean gripper position for scalar task-level APIs."""
+        return self.get_gripper_qpos_all().mean().cpu().item()
+
     def get_gripper_percentage(self):
-        return self.get_gripper_qpos().item() / self.gripper_max_qpos
+        return self.get_gripper_qpos() / self.gripper_max_qpos
 
     def set_arm(self, pos:torch.Tensor, vel:torch.Tensor=None, env_ids:slice=None, force:bool=True):
         '''设置目标位姿'''

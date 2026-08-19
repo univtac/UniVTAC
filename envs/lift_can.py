@@ -3,7 +3,11 @@ import numpy as np
 
 @configclass
 class TaskCfg(BaseTaskCfg):
-    adaptive_grasp_depth_threshold = {'gsmini': 27.8, 'gf225': 25.6, 'xensews': 25.1}
+    # Positive indentation target in millimetres.
+    adaptive_grasp_depth_threshold = {'gsmini': 0.2, 'gf225': 1.4, 'xensews': 0.0}
+    # Loading all variants at once makes the unused cans participate in UIPC
+    # contact solving. Collection configs may select one variant per process.
+    can_sizes: tuple[int, ...] = (4, 5, 6)
 
 class Task(BaseTask):
     def __init__(self, cfg: BaseTaskCfg, mode:Literal['collect', 'eval'] = 'collect', render_mode: str|None = None, **kwargs):
@@ -16,7 +20,9 @@ class Task(BaseTask):
             5: Pose([-1.0, 1.0, 0.027], [1, 0, 0, 0]),
             6: Pose([-1.0, -1.0, 0.032], [1, 0, 0, 0])
         }
-        for d in [4, 5, 6]:
+        for d in self.cfg.can_sizes:
+            if d not in pose_dict:
+                raise ValueError(f"Unsupported can size: {d}")
             self.cans[d] = self._actor_manager.add_from_usd_file(
                 name=f'can_d{d}',
                 asset_path=f"Can_d{d}cm.usd",
@@ -25,7 +31,7 @@ class Task(BaseTask):
 
     def _reset_actors(self):
         can_offset = self.create_noise([0.02, 0.05, 0.0])
-        can_size = self.rng.choice([4, 5, 6])
+        can_size = self.rng.choice(list(self.cans))
         can_pose = Pose(
             [0.7, 0.0, 0.005*can_size+0.001], [1, 0, 0, 0]
         ).add_offset(can_offset)
@@ -74,11 +80,11 @@ class Task(BaseTask):
     def check_early_stop(self):
         can_pose = self.can.get_pose()
         inhand_pose = self._robot_manager.get_inhand_pose(self.can)
-        min_depth = torch.min(self._tactile_manager.get_min_depth()).item()
+        max_press_depth = torch.max(self._tactile_manager.get_press_depth()).item()
         
-        if min_depth < 20:
+        if max_press_depth > SAFE_PRESS_DEPTH_LIMIT_MM[self.cfg.tactile_sensor_type]:
             self.metadata['early_stop'] = True
-            self.metadata['min_depth'] = float(min_depth)
+            self.metadata['max_press_depth'] = float(max_press_depth)
             return True
         if np.abs(inhand_pose.p[2] - self.origin_inhand_pose.p[2]) > 0.05 and \
             np.abs(np.dot(can_pose.to_transformation_matrix()[:3, 2], np.array([0, 0, 1]))) > 0.99:
