@@ -7,7 +7,7 @@
 
 ## Installation
 
-The `isaac51` branch targets Isaac Sim 5.1.0 and Isaac Lab 2.3.0. The installer creates a project-local Python 3.11 `.venv` with `uv`, then installs the modified local TacEx, libuipc and cuRobo dependencies.
+The `isaac51` branch targets Isaac Sim 5.1.0 and Isaac Lab 2.3.0. The installer creates or updates a Conda environment named `UniVTAC` with Python 3.11 and CUDA 12.6, then installs the modified local TacEx, libuipc and cuRobo dependencies.
 
 ```bash
 git clone https://github.com/univtac/UniVTAC.git

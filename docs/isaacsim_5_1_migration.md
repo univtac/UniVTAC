@@ -6,18 +6,17 @@ TacEx/libuipc revisions are recorded in
 
 ## Environment
 
-Create the project-local environment and install Isaac Lab with Isaac Sim:
+Create/update the Conda environment, then install the complete stack:
 
 ```bash
-uv venv --python 3.11 .venv
-uv pip install --python .venv/bin/python setuptools==75.8.2
-uv pip install --python .venv/bin/python flatdict==4.0.1 --no-build-isolation
-UV_HTTP_TIMEOUT=600 uv pip install --python .venv/bin/python \
-  'isaaclab[isaacsim,all]==2.3.0' --extra-index-url https://pypi.nvidia.com
+bash scripts/install.sh
+conda activate UniVTAC
 ```
 
-Install the TacEx Python packages and build the vendored libuipc binding from
-`third_party/TacEx/source` after Isaac Sim is installed.
+The installer first applies TacEx's libuipc Conda YAML, then installs Isaac Sim,
+Isaac Lab, the local TacEx packages, vendored libuipc, and cuRobo into that same
+environment. CUDA is uniformly pinned to 12.6. See [Install.md](./Install.md)
+for prerequisites, exact versions, and validation.
 
 The TacEx Taxim dependency is pinned to the Python 3.11 / PyTorch 2.7 / CUDA
 12.6 `torch_scatter` wheel used by Isaac Sim 5.1 (the upstream branch still

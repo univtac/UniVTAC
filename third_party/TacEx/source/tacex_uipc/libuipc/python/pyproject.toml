@@ -18,7 +18,7 @@ dependencies = [
     "numpy", "polyscope>=2.5.0, <3.0.0"
 ]
 requires-python = ">=3.10, <3.14"
-description = "A Cross-Platform Modern C++20 Library of Unified Incremental Potential Contact (CUDA 12.6+ required)"
+description = "A Cross-Platform Modern C++20 Library of Unified Incremental Potential Contact (CUDA 12.6 required)"
 keywords = ["ipc", "computer graphics", "physics simulation", "cuda", "fem", "contact"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -59,4 +59,3 @@ markers = [
     "typing: mark a test as requiring type checking",
     "example: mark a test as an example",
 ]
-
