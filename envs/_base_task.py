@@ -16,7 +16,7 @@ import decorator
 import carb
 import omni.ui
 import logging
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from isaacsim.core.api.objects import VisualCuboid
 from isaacsim.core.prims import XFormPrim
 with suppress(ImportError):
@@ -178,13 +178,18 @@ class BaseTaskCfg(DirectRLEnvCfg):
             update_period=1/120,
         )
     ]
-
     robot: RobotCfg = None
+    arm_stiffness: float = DEFAULT_ARM_STIFFNESS
+    """Shoulder/forearm implicit-PD stiffness used for position control."""
+    arm_damping: float = DEFAULT_ARM_DAMPING
+    """Shoulder/forearm implicit-PD damping used for position control."""
     tactile_sensor_type:Literal['gsmini', 'xensews', 'gf225'] = 'gsmini'
     tactile_optical_backend: Literal["taxim", "pix2pix"] = "taxim"
     """GelSight optical backend selected once when the environment starts."""
 
     planner_time_dilation_factor: float = 1.0
+    planner_use_cuda_graph: bool = True
+    planner_interpolation_steps: int = 5000
 
     gaussian_noise_cfg: GaussianNoiseCfg = GaussianNoiseCfg(mean=0.0, std=0.002, operation="add")
     
@@ -228,6 +233,13 @@ class BaseTask(UipcRLEnv):
         self.plan_success = True
         self.eval_success = False
         self.in_pre_move = False
+        # ``cfg.decimation`` is a control-stage setting. Reset, marker
+        # calibration, and task-specific pre-move always advance one physics
+        # step per logical step so their initial state is independent of replay
+        # or collection decimation.
+        self._active_decimation = 1
+        self._physics_step_count = 0
+        self._last_render_physics_step = -1
         self.last_qpos = None
         self.keep_still_times = 0
         self.atom_tag = ''
@@ -249,12 +261,23 @@ class BaseTask(UipcRLEnv):
         data_type = ["camera_depth", "tactile_rgb", "marker_rgb", "marker_motion"]
         if cfg.tactile_sensor_type == 'gsmini':
             cfg.robot = create_franka_gsmini_gripper(
-                data_type=data_type, optical_backend=cfg.tactile_optical_backend
+                data_type=data_type,
+                optical_backend=cfg.tactile_optical_backend,
+                arm_stiffness=cfg.arm_stiffness,
+                arm_damping=cfg.arm_damping,
             )
         elif cfg.tactile_sensor_type == 'gf225':
-            cfg.robot = create_franka_gf225_gripper(data_type=data_type)
+            cfg.robot = create_franka_gf225_gripper(
+                data_type=data_type,
+                arm_stiffness=cfg.arm_stiffness,
+                arm_damping=cfg.arm_damping,
+            )
         elif cfg.tactile_sensor_type == 'xensews':
-            cfg.robot = create_franka_xensews_gripper(data_type=data_type)
+            cfg.robot = create_franka_xensews_gripper(
+                data_type=data_type,
+                arm_stiffness=cfg.arm_stiffness,
+                arm_damping=cfg.arm_damping,
+            )
         else:
             raise ValueError(f'Unknown tactile sensor type: {cfg.tactile_sensor_type}')
         
@@ -505,6 +528,9 @@ class BaseTask(UipcRLEnv):
         self.step_cost = np.zeros(20)
         self.last_step = time.perf_counter()
         self.last_render = -1
+        self._active_decimation = 1
+        self._physics_step_count = 0
+        self._last_render_physics_step = -1
         self.take_action_cnt = 0
         self.current_goal_idx = 0
         self.render_outdated = True
@@ -521,12 +547,29 @@ class BaseTask(UipcRLEnv):
         self.uipc_sim.update_render_meshes()
         self.sim.render()
         
-        dt = self.physics_dt * self.cfg.decimation * max(1, self.step_count - self.last_render)
+        elapsed_physics_steps = max(
+            1, self._physics_step_count - self._last_render_physics_step
+        )
+        dt = self.physics_dt * elapsed_physics_steps
         self.scene.update(dt=dt)
         self._actor_manager.update(dt=dt)
         self._tactile_manager.update(dt=dt, force_recompute=True)
  
         self.last_render = self.step_count
+        self._last_render_physics_step = self._physics_step_count
+
+    @contextmanager
+    def _configured_decimation(self):
+        """Apply configured decimation only inside a control-stage scope."""
+        configured_decimation = int(self.cfg.decimation)
+        if configured_decimation < 1:
+            raise ValueError("decimation must be a positive integer.")
+        previous_decimation = self._active_decimation
+        self._active_decimation = configured_decimation
+        try:
+            yield
+        finally:
+            self._active_decimation = previous_decimation
     
     def get_frame_shot(self, obs):
         head_obs = obs['observation']['head']['rgb'].clone()
@@ -591,13 +634,17 @@ class BaseTask(UipcRLEnv):
         self.step_count += 1
 
         is_save = is_save and (not self.in_pre_move) and (not self.mode == 'eval_test')
-        save_freq = (self.cfg.video_frequency > 0 and self.step_count % self.cfg.save_frequency == 0)
+        save_freq = (
+            self.cfg.save_frequency > 0
+            and self.step_count % self.cfg.save_frequency == 0
+        )
         video_freq = (self.cfg.video_frequency > 0 and self.step_count % self.cfg.video_frequency == 0)
         render_freq = (self.cfg.render_frequency > 0 and self.step_count % self.cfg.render_frequency == 0)
 
         self.scene.write_data_to_sim()
-        for _ in range(self.cfg.decimation):
+        for _ in range(self._active_decimation):
             self.sim.step(render=False)
+            self._physics_step_count += 1
 
         if render_freq or (self.mode == 'collect' and is_save and save_freq) or (is_save and video_freq) \
             or (self.mode == 'eval' and not self.in_pre_move):
@@ -654,7 +701,8 @@ class BaseTask(UipcRLEnv):
         pass
 
     def play_once(self):
-        ret = self._play_once()
+        with self._configured_decimation():
+            ret = self._play_once()
         if ret is not None:
             self.metadata.update()
         self._save_metadata()
@@ -692,6 +740,7 @@ class BaseTask(UipcRLEnv):
             self.video_handler.close(result)
         if result is not None:
             self.metadata['cost_step'] = self.step_count
+            self.metadata['cost_physics_step'] = self._physics_step_count
             self.metadata['cost_time'] = time.perf_counter() - self.start_time
             self.metadata['result'] = result
             self._save_metadata()
@@ -740,7 +789,8 @@ class BaseTask(UipcRLEnv):
         delay: bool = True,
         constraint_pose = None,
         time_dilation_factor = None,
-        gripper_press_depth_threshold = None
+        gripper_press_depth_threshold = None,
+        force: bool = True,
     ):
         """
         Take action for the robot.
@@ -804,7 +854,7 @@ class BaseTask(UipcRLEnv):
                     self.plan_success = False
                     return False
             
-            self.take_dense_action(control_seq, is_save)
+            self.take_dense_action(control_seq, is_save, force=force)
             if delay:
                 self.delay(10, is_save)
         self._update_render()
@@ -821,7 +871,12 @@ class BaseTask(UipcRLEnv):
         self._update_render()
         return True
  
-    def take_dense_action(self, control_seq, is_save:bool=True):
+    def take_dense_action(
+        self,
+        control_seq,
+        is_save: bool = True,
+        force: bool = True,
+    ):
         """
         control_seq:
             arm, gripper
@@ -844,11 +899,12 @@ class BaseTask(UipcRLEnv):
                 if arm_seq is not None and idx < arm_steps:
                     self._robot_manager.set_arm(
                         arm_seq['position'][idx],
-                        arm_seq['velocity'][idx]
+                        arm_seq['velocity'][idx],
+                        force=force,
                     )
                 if gripper_active:
                     pos, vel, gripper_active = next(gripper_planner)
-                    self._robot_manager.set_gripper(pos, vel)
+                    self._robot_manager.set_gripper(pos, vel, force=force)
                 self._step(is_save)
                 idx += 1
         else:
@@ -857,12 +913,14 @@ class BaseTask(UipcRLEnv):
                 if arm_seq is not None and idx < arm_steps:
                     self._robot_manager.set_arm(
                         arm_seq['position'][idx],
-                        arm_seq['velocity'][idx]
+                        arm_seq['velocity'][idx],
+                        force=force,
                     )
                 if gripper_steps is not None and idx < gripper_steps:
                     self._robot_manager.set_gripper(
                         gripper_seq['position'][idx],
-                        gripper_seq['velocity'][idx]
+                        gripper_seq['velocity'][idx],
+                        force=force,
                     )
                 self._step(is_save)
         return True
@@ -870,13 +928,38 @@ class BaseTask(UipcRLEnv):
     def check_early_stop(self):
         return False
 
-    def take_action(self, action:torch.Tensor, action_type:Literal['qpos', 'ee', 'delta_ee']='qpos', force:bool=True):
+    def take_action(
+        self,
+        action: torch.Tensor,
+        action_type: Literal['qpos', 'ee', 'delta_ee'] = 'qpos',
+        force: bool = False,
+        stop_on_success: bool = True,
+        is_save: bool = True,
+    ):
+        with self._configured_decimation():
+            return self._take_action(
+                action=action,
+                action_type=action_type,
+                force=force,
+                stop_on_success=stop_on_success,
+                is_save=is_save,
+            )
+
+    def _take_action(
+        self,
+        action: torch.Tensor,
+        action_type: Literal['qpos', 'ee', 'delta_ee'] = 'qpos',
+        force: bool = False,
+        stop_on_success: bool = True,
+        is_save: bool = True,
+    ):
         '''
             qpos     : actions is Tensor([8]), qpos (7 DOFS + gripper)
             ee       : actions is Tensor([7]), position (3), orientation (4)
             delta_ee : actions is Tensor([6]), delta_position (3), delta_orientation (3)
         '''
-        if self.take_action_cnt >= self.cfg.step_lim or self.eval_success:
+        if self.take_action_cnt >= self.cfg.step_lim \
+                or (stop_on_success and self.eval_success):
             return True, self.eval_success
 
         exec_success = True
@@ -888,7 +971,7 @@ class BaseTask(UipcRLEnv):
             target_gripper_pos = action[7:]
             exec_success = self.move([
                 Action(action='all', target_pose=target_pose, target_gripper_pos=target_gripper_pos)
-            ], delay=False)
+            ], delay=False, force=force)
         elif action_type == 'delta_ee':
             ee_pose = self._robot_manager.get_ee_pose()
             ee_next_pose = ee_pose.add_bias(action[:3], coord='world')\
@@ -897,11 +980,11 @@ class BaseTask(UipcRLEnv):
             gripper_next_pos = gripper_pos + action[6]
             exec_success = self.move([
                 Action(action='all', target_pose=ee_next_pose, target_gripper_pos=gripper_next_pos)
-            ], delay=False)
+            ], delay=False, force=force)
         else:
             self._robot_manager.set_arm(action[:-1], force=force)
             self._robot_manager.set_gripper(action[-1], force=force)
-            self._step()
+            self._step(is_save=is_save)
         
         if self.check_success():
             self.eval_success = True

@@ -258,7 +258,7 @@ class VideoHandler:
  
     def write(self, frame:torch.Tensor):
         frame = frame.cpu().numpy()
-        if frame.shape != self.video_size:
+        if frame.shape[:2] != (self.video_size[1], self.video_size[0]):
             frame = cv2.resize(frame, self.video_size)
         self.ffmpeg.stdin.write(frame.tobytes())
         # cv2.putText(frame, f'Streaming [{self.video_path.stem}]', (10, 30),

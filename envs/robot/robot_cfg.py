@@ -23,6 +23,30 @@ SAFE_PRESS_DEPTH_LIMIT_MM = {
     "xensews": 5.0,
 }
 
+DEFAULT_ARM_STIFFNESS = 1_250_000.0
+DEFAULT_ARM_DAMPING = 2_500.0
+
+
+def _apply_franka_arm_pd(
+    robot: ArticulationCfg,
+    stiffness: float,
+    damping: float,
+) -> ArticulationCfg:
+    """Configure the implicit-PD gains used by arm position control."""
+    if stiffness <= 0:
+        raise ValueError("arm_stiffness must be positive.")
+    if damping < 0:
+        raise ValueError("arm_damping must be non-negative.")
+
+    arm_actuators = {"panda_shoulder", "panda_forearm"}
+    robot.actuators = {
+        name: actuator.replace(stiffness=stiffness, damping=damping)
+        if name in arm_actuators else actuator
+        for name, actuator in robot.actuators.items()
+    }
+    return robot
+
+
 @configclass
 class RobotCfg:
     robot: ArticulationCfg = None
@@ -35,8 +59,12 @@ class RobotCfg:
     adaptive_grasp_depth_threshold: float = 0.5 # positive press depth in mm
     contact_threshold: tuple[float, float] = (0.1, 0.5) # positive press-depth hysteresis band in mm
 
+
 def create_franka_gsmini_gripper(
-    data_type: list[str], optical_backend: Literal["taxim", "pix2pix"] = "taxim"
+    data_type: list[str],
+    optical_backend: Literal["taxim", "pix2pix"] = "taxim",
+    arm_stiffness: float = DEFAULT_ARM_STIFFNESS,
+    arm_damping: float = DEFAULT_ARM_DAMPING,
 ):
     robot = FRANKA_PANDA_ARM_GSMINI_GRIPPER_HIGH_PD_HIGH_RES_UIPC_CFG.replace(
         prim_path="/World/envs/env_.*/Robot",
@@ -53,6 +81,7 @@ def create_franka_gsmini_gripper(
             }
         ),
     )
+    robot = _apply_franka_arm_pd(robot, arm_stiffness, arm_damping)
     tactiles = [
         create_tactile_cfg(
             prim_path="/World/envs/env_.*/Robot/gelsight_mini_case_left",
@@ -83,7 +112,12 @@ def create_franka_gsmini_gripper(
         contact_threshold=(0.1, 0.5),
     )
 
-def create_franka_gf225_gripper(data_type:list[str]):
+
+def create_franka_gf225_gripper(
+    data_type: list[str],
+    arm_stiffness: float = DEFAULT_ARM_STIFFNESS,
+    arm_damping: float = DEFAULT_ARM_DAMPING,
+):
     robot = FRANKA_PANDA_ARM_GF225_GRIPPER_HIGH_PD_HIGH_RES_UIPC_CFG.replace(
         prim_path="/World/envs/env_.*/Robot",
         init_state=ArticulationCfg.InitialStateCfg(
@@ -99,6 +133,7 @@ def create_franka_gf225_gripper(data_type:list[str]):
             }
         ), 
     )
+    robot = _apply_franka_arm_pd(robot, arm_stiffness, arm_damping)
     tactiles = [
         create_tactile_cfg(
             prim_path="/World/envs/env_.*/Robot/GF225_left",
@@ -127,7 +162,12 @@ def create_franka_gf225_gripper(data_type:list[str]):
         contact_threshold=(0.1, 0.5),
     )
 
-def create_franka_xensews_gripper(data_type:list[str]):
+
+def create_franka_xensews_gripper(
+    data_type: list[str],
+    arm_stiffness: float = DEFAULT_ARM_STIFFNESS,
+    arm_damping: float = DEFAULT_ARM_DAMPING,
+):
     robot = FRANKA_PANDA_ARM_XENSEWS_GRIPPER_HIGH_PD_HIGH_RES_UIPC_CFG.replace(
         prim_path="/World/envs/env_.*/Robot",
         init_state=ArticulationCfg.InitialStateCfg(
@@ -143,6 +183,7 @@ def create_franka_xensews_gripper(data_type:list[str]):
             }
         ),
     )
+    robot = _apply_franka_arm_pd(robot, arm_stiffness, arm_damping)
     tactiles = [
         create_tactile_cfg(
             prim_path="/World/envs/env_.*/Robot/XenseWS_left",

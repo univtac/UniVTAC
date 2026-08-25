@@ -84,7 +84,9 @@ class RobotManager:
             all_joints_name=self.robot.joint_names,
             active_joints_name=self._arm_joint_names,
             robot_prime_path=self.cfg.robot.prim_path,
-            yaml_path=self.yaml_path
+            yaml_path=self.yaml_path,
+            use_cuda_graph=self.task.cfg.planner_use_cuda_graph,
+            interpolation_steps=self.task.cfg.planner_interpolation_steps,
         )
         self.planner = CuroboPlanner(
             task=self.task,

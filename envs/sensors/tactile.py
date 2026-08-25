@@ -57,6 +57,9 @@ def create_gelsight_mini_cfg(
     else:
         raise ValueError(f"Unknown GelSight optical backend: {optical_backend!r}")
 
+    needs_optical_sim = any(name in data_type for name in ("tactile_rgb", "marker_rgb"))
+    needs_marker_sim = any(name in data_type for name in ("marker_motion", "marker_rgb"))
+
     sensor_cfg = sensor_cfg.replace(
         prim_path=prim_path,
         sensor_camera_cfg=sensor_cfg.SensorCameraCfg(
@@ -70,28 +73,35 @@ def create_gelsight_mini_cfg(
         device="cuda",
         debug_vis=False,  # for rendering sensor output in the gui
         update_period=1/120,
-        marker_motion_sim_cfg=ManiSkillSimulatorCfg(
-            device="cuda",
-            tactile_img_res=resolution,
-            marker_shape=(9, 7),
-            marker_interval=(2.40625, 2.45833),
-            sub_marker_num=0,
-            marker_radius=6,
-            camera_to_surface=0.0283,
-            real_size=(0.0266, 0.0209),
-            sensor_type='gsmini',
+        marker_motion_sim_cfg=(
+            ManiSkillSimulatorCfg(
+                device="cuda",
+                tactile_img_res=resolution,
+                marker_shape=(9, 7),
+                marker_interval=(2.40625, 2.45833),
+                sub_marker_num=0,
+                marker_radius=6,
+                camera_to_surface=0.0283,
+                real_size=(0.0266, 0.0209),
+                sensor_type='gsmini',
+            )
+            if needs_marker_sim else None
         ),
         data_types=data_type,
     )
-    sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = (
-        sensor_cfg.marker_motion_sim_cfg.marker_shape[0]
-        * sensor_cfg.marker_motion_sim_cfg.marker_shape[1]
-    )
-    sensor_cfg.optical_sim_cfg = sensor_cfg.optical_sim_cfg.replace(
-        tactile_img_res=resolution,
-        device="cuda",
-    )
-    if optical_backend == "taxim":
+    if sensor_cfg.marker_motion_sim_cfg is not None:
+        sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = (
+            sensor_cfg.marker_motion_sim_cfg.marker_shape[0]
+            * sensor_cfg.marker_motion_sim_cfg.marker_shape[1]
+        )
+    if needs_optical_sim:
+        sensor_cfg.optical_sim_cfg = sensor_cfg.optical_sim_cfg.replace(
+            tactile_img_res=resolution,
+            device="cuda",
+        )
+    else:
+        sensor_cfg.optical_sim_cfg = None
+    if optical_backend == "taxim" and needs_optical_sim:
         sensor_cfg.optical_sim_cfg.with_shadow = False
         sensor_cfg.compute_indentation_depth_class = "optical_sim"
     else:

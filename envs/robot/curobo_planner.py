@@ -34,6 +34,8 @@ class CuroboPlannerCfg:
     active_joints_name: list[str] = None
 
     time_dilation_factor: float = 1.0
+    use_cuda_graph: bool = True
+    interpolation_steps: int = 5000
 
 class CuroboPlanner:
     def __init__(
@@ -76,6 +78,8 @@ class CuroboPlanner:
             position_threshold=0.001,
             rotation_threshold=0.01,
             high_precision=True,
+            use_cuda_graph=cfg.use_cuda_graph,
+            interpolation_steps=cfg.interpolation_steps,
             collision_checker_type=CollisionCheckerType.MESH,
             collision_activation_distance=0.0
         )
