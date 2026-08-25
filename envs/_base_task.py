@@ -186,6 +186,13 @@ class BaseTaskCfg(DirectRLEnvCfg):
     tactile_sensor_type:Literal['gsmini', 'xensews', 'gf225'] = 'gsmini'
     tactile_optical_backend: Literal["taxim", "pix2pix"] = "taxim"
     """GelSight optical backend selected once when the environment starts."""
+    tactile_data_types: list[str] = [
+        "camera_depth",
+        "tactile_rgb",
+        "marker_rgb",
+        "marker_motion",
+    ]
+    """Low-level TacEx outputs initialized for each tactile sensor."""
 
     planner_time_dilation_factor: float = 1.0
     planner_use_cuda_graph: bool = True
@@ -258,7 +265,7 @@ class BaseTask(UipcRLEnv):
         self.set_debug_vis(self.cfg.debug_vis)
     
     def load_robot_and_sensors(self, cfg:BaseTaskCfg):
-        data_type = ["camera_depth", "tactile_rgb", "marker_rgb", "marker_motion"]
+        data_type = list(cfg.tactile_data_types)
         if cfg.tactile_sensor_type == 'gsmini':
             cfg.robot = create_franka_gsmini_gripper(
                 data_type=data_type,

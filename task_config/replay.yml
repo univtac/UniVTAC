@@ -1,0 +1,34 @@
+save_dir: ./data
+
+# Reuse the exact ten-file-per-task ModelScope subset from the reference run.
+data_root: data
+data_config: clean
+max_episodes: 10
+
+# The public dataset already stores one control target every two physics steps.
+decimation: 2
+action_stride: 1
+replay_force: false
+
+save_frequency: 1
+video_frequency: 0
+render_frequency: 0
+rendering_mode: performance
+
+random_texture: false
+
+sensor_type: gsmini
+optical_backend: taxim
+
+observations:
+  camera: ['rgb']
+  tactile: ['rgb', 'rgb_marker', 'marker', 'depth', 'press_depth', 'pose']
+  embodiment: ['joint', 'ee']
+  actor: true
+
+task_overrides:
+  arm_stiffness: 1250000.0
+  arm_damping: 2500.0
+  reset_time_limit: 600
+  planner_use_cuda_graph: false
+  planner_interpolation_steps: 2000

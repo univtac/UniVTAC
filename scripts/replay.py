@@ -416,6 +416,9 @@ def main():
     env_cfg.save_dir = Path('eval_result') / 'replay' / task_file_name / task_config_file.stem / curr_time
     env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)
     env_cfg.sim.render_interval = env_cfg.decimation
+    env_cfg.sim.render.rendering_mode = task_config.get(
+        "rendering_mode", env_cfg.sim.render.rendering_mode
+    )
     env_cfg.obs_data_type = task_config.get("observations", {})
     env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)
     env_cfg.video_frequency = task_config.get("video_frequency", env_cfg.video_frequency)
@@ -446,9 +449,15 @@ def main():
     log(f"Task Overrides: {json.dumps(task_overrides, ensure_ascii=False)}")
     log(f"Task init finish in {task_init_cost:.2f} seconds.")
     
-    dataset_root = args_cli.data_root if args_cli.data_root is not None \
-        else Path(__file__).parent.parent / 'data'
-    data_config_name = args_cli.data_config or task_config_file.stem
+    project_root = Path(__file__).parent.parent
+    if args_cli.data_root is not None:
+        dataset_root = args_cli.data_root
+    else:
+        dataset_root = Path(task_config.get("data_root", project_root / 'data'))
+        if not dataset_root.is_absolute():
+            dataset_root = project_root / dataset_root
+    data_config_name = args_cli.data_config \
+        or task_config.get("data_config", task_config_file.stem)
     data_root = dataset_root.resolve() / task_file_name / data_config_name
     if (data_root / 'hdf5').exists():
         print(f"Found hdf5 data in {data_root / 'hdf5'}, start replaying.")
@@ -480,7 +489,10 @@ def main():
 
     if args_cli.start_index < 0:
         raise ValueError("--start-index must be non-negative.")
-    if args_cli.max_episodes is not None and args_cli.max_episodes <= 0:
+    max_episodes = args_cli.max_episodes
+    if max_episodes is None:
+        max_episodes = task_config.get("max_episodes")
+    if max_episodes is not None and max_episodes <= 0:
         raise ValueError("--max-episodes must be positive.")
 
     action_stride = args_cli.action_stride
@@ -495,8 +507,8 @@ def main():
     if not isinstance(replay_force, bool):
         raise ValueError("replay_force must be a boolean.")
 
-    stop_index = None if args_cli.max_episodes is None \
-        else args_cli.start_index + args_cli.max_episodes
+    stop_index = None if max_episodes is None \
+        else args_cli.start_index + max_episodes
     data = data[args_cli.start_index:stop_index]
 
     if not data:
