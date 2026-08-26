@@ -83,6 +83,8 @@ class BaseTaskCfg(DirectRLEnvCfg):
     video_frequency = 1
     render_frequency = 0
     video_size = (960, 320)
+    video_panels: list[str] | None = None
+    """Optional ``source:name:data_type`` panels used to compose replay videos."""
 
     ui_window_class_type = BaseEnvWindow
 
@@ -178,6 +180,8 @@ class BaseTaskCfg(DirectRLEnvCfg):
             update_period=1/120,
         )
     ]
+    camera_names: list[str] | None = None
+    """Names of scene cameras to initialize; ``None`` keeps every task camera."""
     robot: RobotCfg = None
     arm_stiffness: float = DEFAULT_ARM_STIFFNESS
     """Shoulder/forearm implicit-PD stiffness used for position control."""
@@ -265,6 +269,26 @@ class BaseTask(UipcRLEnv):
         self.set_debug_vis(self.cfg.debug_vis)
     
     def load_robot_and_sensors(self, cfg:BaseTaskCfg):
+        if cfg.camera_names is not None:
+            requested_camera_names = list(cfg.camera_names)
+            if len(requested_camera_names) != len(set(requested_camera_names)):
+                raise ValueError(
+                    f"camera_names contains duplicates: {requested_camera_names}"
+                )
+            available_cameras = {camera.name: camera for camera in cfg.cameras}
+            unknown_camera_names = [
+                name for name in requested_camera_names
+                if name not in available_cameras
+            ]
+            if unknown_camera_names:
+                raise ValueError(
+                    f"Unknown camera names {unknown_camera_names}; available cameras are "
+                    f"{list(available_cameras)}."
+                )
+            cfg.cameras = [
+                available_cameras[name] for name in requested_camera_names
+            ]
+
         data_type = list(cfg.tactile_data_types)
         if cfg.tactile_sensor_type == 'gsmini':
             cfg.robot = create_franka_gsmini_gripper(
@@ -510,7 +534,6 @@ class BaseTask(UipcRLEnv):
             )
 
         reports = self._tactile_manager.calibrate_marker_references()
-        self.metadata['marker_calibration'] = reports
         # Refresh the sensor output using the newly frozen reference before any
         # task-specific pre-move or contact starts.
         self._update_render()
@@ -579,6 +602,43 @@ class BaseTask(UipcRLEnv):
             self._active_decimation = previous_decimation
     
     def get_frame_shot(self, obs):
+        if self.cfg.video_panels is not None:
+            panels = []
+            observation_sources = {
+                "camera": obs["observation"],
+                "tactile": obs["tactile"],
+            }
+            for panel_spec in self.cfg.video_panels:
+                try:
+                    source, name, data_type = panel_spec.split(":", maxsplit=2)
+                    panel = observation_sources[source][name][data_type].clone()
+                except (ValueError, KeyError) as exc:
+                    raise ValueError(
+                        "Invalid video panel "
+                        f"{panel_spec!r}; expected an available "
+                        "'camera:<name>:<data_type>' or "
+                        "'tactile:<name>:<data_type>' observation."
+                    ) from exc
+                if panel.ndim != 3 or panel.shape[-1] not in (3, 4):
+                    raise ValueError(
+                        f"Video panel {panel_spec!r} must be an HWC RGB/RGBA "
+                        f"tensor, got shape {tuple(panel.shape)}."
+                    )
+                panels.append(panel[..., :3])
+
+            if not panels:
+                raise ValueError("video_panels must contain at least one panel.")
+            target_height = max(panel.shape[0] for panel in panels)
+            resized_panels = []
+            for panel in panels:
+                target_width = round(panel.shape[1] * target_height / panel.shape[0])
+                resized_panels.append(
+                    torchvision.transforms.Resize((target_height, target_width))(
+                        panel.permute(2, 0, 1)
+                    ).permute(1, 2, 0)
+                )
+            return torch.cat(resized_panels, dim=1)
+
         head_obs = obs['observation']['head']['rgb'].clone()
         wrist_obs = obs['observation']['wrist']['rgb'].clone()
         tac_size = 160
@@ -1117,16 +1177,6 @@ class BaseTask(UipcRLEnv):
 
         final_press_depth = self._tactile_manager.get_press_depth()
         final_qpos = self._robot_manager.get_gripper_qpos_all()
-        self.metadata.setdefault('adaptive_grasp', []).append({
-            'direction': direct,
-            'depth_signal': 'gel_indentation' if use_gel_indentation else 'camera_depth',
-            'target_press_depth': None if target_press_depth is None else float(target_press_depth),
-            'final_press_depth': final_press_depth.tolist(),
-            'final_gripper_qpos': float(final_qpos.mean().item()),
-            'final_gripper_qpos_per_finger': final_qpos.tolist(),
-            'stop_reason': stop_reason,
-            'slow_mode_entry': slow_mode_entry,
-        })
         final_position = final_qpos
         yield final_position, torch.zeros_like(final_position), False
 
