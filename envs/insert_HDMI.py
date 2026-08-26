@@ -43,7 +43,7 @@ class Task(BaseTask):
             name='slot',
             asset_path="HDMISlot.usd",
             pose=base_pose,
-            density=1e5
+            motion_type="kinematic",
         )
 
         self.prism = self._actor_manager.add_from_usd_file(

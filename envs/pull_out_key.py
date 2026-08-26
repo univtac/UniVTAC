@@ -20,7 +20,7 @@ class Task(BaseTask):
             name='slot',
             asset_path="KeySlot.usd",
             pose=base_pose,
-            density=1e5
+            motion_type="kinematic",
         )
         self.key = self._actor_manager.add_from_usd_file(
             name='key',
@@ -33,11 +33,11 @@ class Task(BaseTask):
         random_pose = self.create_noise([0.005, 0.005, 0.0])
         random_rotate = self.rng.uniform(-np.pi/4, np.pi/4)
         base_pose = Pose([0.5, 0.0, 0.002], [1, 0, 0, 0]).add_offset(random_pose)
-        key_pose = base_pose.add_bias([-0.0025, 0, 0.0785])
-
         base_pose = base_pose.add_rotation([0, 0, random_rotate])
+
         self.key_rotation = self.rng.uniform(-np.pi/2, -np.pi/4)
-        key_pose = key_pose.add_rotation([0, 0, random_rotate+self.key_rotation])
+        key_pose = base_pose.add_bias([-0.0025, 0, 0.0785])
+        key_pose = key_pose.add_rotation([0, 0, self.key_rotation])
 
         self.slot.set_pose(base_pose)
         self.key.set_pose(key_pose)

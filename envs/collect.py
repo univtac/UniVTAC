@@ -39,14 +39,14 @@ class Task(BaseTask):
             name='stand',
             asset_path="Stand.usd",
             pose=stand_pose,
-            density=1e5
+            motion_type="kinematic",
         )
         self.prism_name = os.environ.get('PRISM_NAME', 'Hemisphere')
         self.prism = self._actor_manager.add_from_usd_file(
             name='prism',
             asset_path=f"Bar_{self.prism_name}.usd",
             pose=prism_pose,
-            density=1e5
+            motion_type="kinematic",
         )
     
     def pre_move(self):

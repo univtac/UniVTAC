@@ -18,13 +18,13 @@ class Task(BaseTask):
             name='slot',
             asset_path="TestTubeHoleSlot.usd",
             pose=slot_pose,
-            density=1e5
+            motion_type="kinematic",
         )
         self.prism_base = self._actor_manager.add_from_usd_file(
             name='prism_base',
             asset_path="TestTubeBase.usd",
             pose=base_pose,
-            density=1e5
+            motion_type="kinematic",
         )
         self.prism = self._actor_manager.add_from_usd_file(
             name='prism',

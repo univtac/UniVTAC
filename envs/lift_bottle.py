@@ -19,7 +19,7 @@ class Task(BaseTask):
             name='wall',
             asset_path="Wall.usd", 
             pose=wall_pose,
-            density=1e5
+            motion_type="kinematic",
         )
         self.bottle = self._actor_manager.add_from_usd_file(
             name='bottle',

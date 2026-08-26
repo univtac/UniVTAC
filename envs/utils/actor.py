@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING, Generator, Literal
 
@@ -31,20 +32,24 @@ if TYPE_CHECKING:
 
 
 BodyType = Literal["rigid", "deformable"]
+MotionType = Literal["dynamic", "kinematic"]
 
 
 @configclass
 class ActorCfg(AssetBaseCfg):
     """UniVTAC task actor configuration.
 
-    ``body_type`` is deliberately explicit: task props default to affine rigid
-    bodies, while gel pads are configured independently as deformable objects.
+    ``body_type`` selects the UIPC constitution family. ``motion_type`` is an
+    independent task-level semantic: dynamic actors respond to forces, while
+    kinematic rigid actors keep the pose written by the task and still
+    participate in contact.
     """
 
     class_type: type | None = None
     name: str = "actor"
     asset: str | None = None
     body_type: BodyType = "rigid"
+    motion_type: MotionType = "dynamic"
     center: tuple[float, float, float] = (0.0, 0.0, 0.0)
     extents: tuple[float, float, float] = (0.1, 0.1, 0.1)
     mass_density: float = 1e3
@@ -67,10 +72,15 @@ class Actor:
     def __init__(self, task: BaseTask, cfg: ActorCfg):
         if cfg.body_type not in ("rigid", "deformable"):
             raise ValueError(f"Unsupported actor body_type: {cfg.body_type!r}")
+        if cfg.motion_type not in ("dynamic", "kinematic"):
+            raise ValueError(f"Unsupported actor motion_type: {cfg.motion_type!r}")
+        if cfg.body_type != "rigid" and cfg.motion_type == "kinematic":
+            raise ValueError("Kinematic motion is currently supported only for rigid actors.")
 
         self.task = task
         self.cfg = cfg
         self.body_type: BodyType = cfg.body_type
+        self.motion_type: MotionType = cfg.motion_type
         self.init_pose = Pose(cfg.init_state.pos, cfg.init_state.rot)
         self._initial_transform = self.init_pose.to_transformation_matrix()
         self._pending_hard_pose: Pose | None = None
@@ -88,7 +98,15 @@ class Actor:
             usd_mesh_prim_name=cfg.usd_mesh_prim_name,
         )
         if self.body_type == "rigid":
-            constitution_cfg = cfg.constitution_cfg or UipcRigidObjectCfg.AffineBodyConstitutionCfg()
+            is_kinematic = self.motion_type == "kinematic"
+            constitution_cfg = (
+                UipcRigidObjectCfg.AffineBodyConstitutionCfg()
+                if cfg.constitution_cfg is None
+                else deepcopy(cfg.constitution_cfg)
+            )
+            # Motion semantics belong to ActorCfg. Preserve custom material
+            # parameters while preventing a second, conflicting source of truth.
+            constitution_cfg.kinematic = is_kinematic
             body_cfg = UipcRigidObjectCfg(
                 **common,
                 constitution_cfg=constitution_cfg,
@@ -133,6 +151,8 @@ class Actor:
         body_type: BodyType = "rigid",
         constitution_cfg=None,
         density: float = 1e3,
+        *,
+        motion_type: MotionType = "dynamic",
     ) -> Actor:
         asset_path = Path(asset_path)
         if not asset_path.is_absolute():
@@ -143,6 +163,7 @@ class Actor:
             name=name,
             asset=str(asset_path),
             body_type=body_type,
+            motion_type=motion_type,
             prim_path=f"/World/envs/env_.*/{name}",
             init_state=AssetBaseCfg.InitialStateCfg(pos=pose.p, rot=pose.q),
             spawn=sim_utils.UsdFileCfg(
@@ -176,6 +197,11 @@ class Actor:
         self.next_pts = self._target_vertices(pose, self._initial_surface_vertices)
 
         if soft:
+            if self.motion_type == "kinematic":
+                raise ValueError(
+                    "Kinematic actors cannot use a soft pose target; use a hard "
+                    "set_pose call to reposition them."
+                )
             self._pending_hard_pose = None
             if self.body_type == "rigid":
                 self.body.constraint.set_target(target_transform)
@@ -310,6 +336,8 @@ class ActorManager:
         body_type: BodyType = "rigid",
         constitution_cfg=None,
         density: float = 1e3,
+        *,
+        motion_type: MotionType = "dynamic",
     ) -> Actor:
         actor = Actor.from_usd_file(
             self.task,
@@ -317,6 +345,7 @@ class ActorManager:
             asset_path,
             pose,
             body_type=body_type,
+            motion_type=motion_type,
             constitution_cfg=constitution_cfg,
             density=density,
         )
