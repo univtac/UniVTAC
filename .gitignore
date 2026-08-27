@@ -1,7 +1,8 @@
 .vscode
 **/__pycache__/
 
-/data
+/data/
+!/data/download.sh
 /eval_result
 
 assets/objects/ipt

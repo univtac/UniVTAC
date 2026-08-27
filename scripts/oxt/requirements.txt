@@ -1,0 +1,6 @@
+modelscope>=1.27,<2
+numpy>=1.24,<2
+h5py>=3.10,<4
+opencv-python-headless>=4.8,<4.11
+zarr>=2.16,<3
+numcodecs>=0.12,<0.16
