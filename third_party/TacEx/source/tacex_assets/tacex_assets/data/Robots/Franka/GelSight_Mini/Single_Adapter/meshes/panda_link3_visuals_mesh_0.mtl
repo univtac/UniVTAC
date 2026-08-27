@@ -1,3 +1,15 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:2ee30e267b3d7b909c75485f3c2a90ee41edf6543ca7deb2a61194f2340285f0
-size 282
+newmtl material_Part__Feature001_010_001_002
+Kd 1.0 1.0 1.0
+Ka 1.0 1.0 1.0
+Ks 0.5 0.5 0.5
+Ns 10.0
+Tf 1.0 1.0 1.0
+d 1.0
+
+newmtl material_Part__Feature_001_001_001_002
+Kd 0.250980406999588 0.250980406999588 0.250980406999588
+Ka 1.0 1.0 1.0
+Ks 0.5 0.5 0.5
+Ns 10.0
+Tf 1.0 1.0 1.0
+d 1.0

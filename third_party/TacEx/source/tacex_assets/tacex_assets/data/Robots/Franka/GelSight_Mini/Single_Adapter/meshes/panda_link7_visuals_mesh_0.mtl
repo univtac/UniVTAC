@@ -1,3 +1,31 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:ef00cff1580e0f3ef58944ae4324a8143c9c58772c564798085e10581434c042
-size 596
+newmtl material_Part__Mirroring001_004_002
+Kd 0.250980406999588 0.250980406999588 0.250980406999588
+Ka 1.0 1.0 1.0
+Ks 0.5 0.5 0.5
+Ns 10.0
+Tf 1.0 1.0 1.0
+d 1.0
+
+newmtl material_Part__Mirroring002_004_001
+Kd 0.250980406999588 0.250980406999588 0.250980406999588
+Ka 1.0 1.0 1.0
+Ks 0.5 0.5 0.5
+Ns 10.0
+Tf 1.0 1.0 1.0
+d 1.0
+
+newmtl material_Part__Mirroring004_004_002
+Kd 1.0 1.0 1.0
+Ka 1.0 1.0 1.0
+Ks 0.5 0.5 0.5
+Ns 10.0
+Tf 1.0 1.0 1.0
+d 1.0
+
+newmtl material_Part__Mirroring_004_001
+Kd 0.8980392217636108 0.917647123336792 0.9294118285179138
+Ka 1.0 1.0 1.0
+Ks 0.5 0.5 0.5
+Ns 10.0
+Tf 1.0 1.0 1.0
+d 1.0
