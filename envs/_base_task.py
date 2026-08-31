@@ -58,6 +58,8 @@ from typing import Any
 
 from ._global import *
 from .utils import *
+from .utils.actor import Actor, ActorCfg, ActorManager
+from .utils.atom import Action, Atom
 from .robot.robot import RobotManager
 from .robot.robot_cfg import *
 from .sensors.camera import CameraManager, CameraCfg
@@ -294,18 +296,21 @@ class BaseTask(UipcRLEnv):
             cfg.robot = create_franka_gsmini_gripper(
                 data_type=data_type,
                 optical_backend=cfg.tactile_optical_backend,
+                update_period=cfg.sim.dt,
                 arm_stiffness=cfg.arm_stiffness,
                 arm_damping=cfg.arm_damping,
             )
         elif cfg.tactile_sensor_type == 'gf225':
             cfg.robot = create_franka_gf225_gripper(
                 data_type=data_type,
+                update_period=cfg.sim.dt,
                 arm_stiffness=cfg.arm_stiffness,
                 arm_damping=cfg.arm_damping,
             )
         elif cfg.tactile_sensor_type == 'xensews':
             cfg.robot = create_franka_xensews_gripper(
                 data_type=data_type,
+                update_period=cfg.sim.dt,
                 arm_stiffness=cfg.arm_stiffness,
                 arm_damping=cfg.arm_damping,
             )
@@ -817,6 +822,18 @@ class BaseTask(UipcRLEnv):
         HDF5Handler().pkls_to_hdf5(self.tmp_save_dir, self.save_path)
     
     def _save_metadata(self):
+        def json_default(value):
+            # Pose, numpy arrays, and torch tensors all expose ``tolist``.
+            # Keeping conversion at the serialization boundary lets tasks retain
+            # the richer in-memory objects while guaranteeing valid metadata JSON.
+            if hasattr(value, 'tolist'):
+                return value.tolist()
+            if hasattr(value, 'item'):
+                return value.item()
+            raise TypeError(
+                f'Object of type {value.__class__.__name__} is not JSON serializable'
+            )
+
         if self.metadata_path.exists():
             try:
                 with open(self.metadata_path, 'r', encoding='utf-8') as f:
@@ -827,7 +844,13 @@ class BaseTask(UipcRLEnv):
             all_metadata = {}
         all_metadata[str(self.cfg.seed)] = self.metadata
         with open(self.metadata_path, 'w', encoding='utf-8') as f:
-            json.dump(all_metadata, f, ensure_ascii=False, indent=4)
+            json.dump(
+                all_metadata,
+                f,
+                ensure_ascii=False,
+                indent=4,
+                default=json_default,
+            )
 
     def save_observations(self, obs: dict):
         def to_cpu(data):

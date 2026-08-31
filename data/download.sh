@@ -9,7 +9,7 @@ SOURCE_DATASET_ID="${SOURCE_DATASET_ID:-byml2024/UniVTAC}"
 # Pinned release for which all 800 trajectories and legacy result fields were reviewed.
 SOURCE_REVISION="${SOURCE_REVISION:-3d4646a7}"
 OXT_DATASET_ID="${OXT_DATASET_ID:-byml2024/UniVTAC-OXT}"
-UNIVTAC_RAW_DIR="${UNIVTAC_RAW_DIR:-$SCRIPT_DIR/modelscope/UniVTAC}"
+UNIVTAC_RAW_DIR="${UNIVTAC_RAW_DIR:-$SCRIPT_DIR}"
 OXT_WORK_DIR="${OXT_WORK_DIR:-$SCRIPT_DIR/oxt/UniVTAC-OXT}"
 DOWNLOAD_WORKERS="${DOWNLOAD_WORKERS:-8}"
 CONVERT_WORKERS="${CONVERT_WORKERS:-4}"
@@ -24,10 +24,11 @@ command:
   download   多 worker 下载 UniVTAC HDF5/metadata
   convert    以单个 HDF5 为粒度进行多进程转换
   package    打包 task Zarr，并生成 OXT 提交 metadata/logo
-  upload     创建新 ModelScope 数据集并整体上传 publish 文件夹
+  upload     在本机准备待上传的 publish 文件夹（不会远程提交）
+  submit     创建新 ModelScope 数据集并提交已准备好的 publish 文件夹
   all        依次执行 download、convert、package（不会上传）
 
-额外参数会传给 convert/package/upload 对应的 Python 脚本。
+额外参数会传给相应的转换、打包或提交脚本。
 EOF
 }
 
@@ -71,6 +72,12 @@ package() {
 }
 
 upload() {
+    package "$@"
+    echo "待上传数据已保存在本机：$OXT_WORK_DIR/publish"
+    echo "未进行远程提交；确认内容后请显式运行：bash data/download.sh submit"
+}
+
+submit() {
     "$PYTHON_BIN" "$REPO_ROOT/scripts/oxt/upload_modelscope.py" \
         --repo-id "$OXT_DATASET_ID" \
         --folder "$OXT_WORK_DIR/publish" \
@@ -90,6 +97,7 @@ case "$command" in
     convert) convert "$@" ;;
     package) package "$@" ;;
     upload) upload "$@" ;;
+    submit) submit "$@" ;;
     all)
         download
         convert "$@"

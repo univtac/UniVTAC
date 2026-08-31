@@ -104,5 +104,6 @@ The full Taxim task used for phase-one validation is:
 
 ```bash
 OMNI_KIT_ACCEPT_EULA=YES .venv/bin/python scripts/collect_data.py \
-  grasp_classify demo --episode_num 1 --max_seed 0 --headless
+  grasp_classify demo --max_seed 0 --headless \
+  --config-overrides collect_settings.episode_num=1
 ```

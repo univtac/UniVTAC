@@ -2,13 +2,16 @@ import argparse
 import importlib
 import json
 import sys
+sys.path.append(".")
+sys.path.append("./policy")
+
 import time
 import traceback
 from pathlib import Path
 from typing import Literal
+from omegaconf import OmegaConf
 
-sys.path.append(".")
-sys.path.append("./policy")
+from envs.utils.env_parser import add_config_override_argument, load_task_config
 
 
 parser = argparse.ArgumentParser(
@@ -26,6 +29,7 @@ parser.add_argument("--start_seed", type=int, default=-1)
 parser.add_argument("--max_seed", type=int, default=-1)
 parser.add_argument("--total_num", type=int, default=100)
 parser.add_argument("--print_only", action="store_true")
+add_config_override_argument(parser)
 
 # Common AppLauncher args accepted by eval_policy.py. They are parsed here so
 # existing launch configs can point at dry_test_policy.py unchanged.
@@ -78,10 +82,12 @@ def get_config(file, default_root: Path, type: Literal["yaml", "json"]):
 
 
 class DryTaskCfg:
-    def __init__(self, task_config: dict, save_dir: Path):
-        self.step_lim = int(task_config.get("step_lim", task_config.get("dry_step_lim", 10)))
+    def __init__(self, task_config, save_dir: Path):
+        self.step_lim = int(task_config.task_overrides.get("step_lim", 10))
         self.save_dir = save_dir
-        self.obs_data_type = task_config.get("observations", {})
+        self.obs_data_type = OmegaConf.to_container(
+            task_config.observation_settings, resolve=True
+        )
 
 
 class DryTask:
@@ -264,10 +270,9 @@ def main():
         print(f"[dry_test_policy] Ignoring Isaac/AppLauncher args: {' '.join(unknown_args)}")
 
     task_file_name = args_cli.task_name
-    task_config, task_config_file = get_config(
+    task_config, task_config_file = load_task_config(
         args_cli.task_config,
-        default_root=Path(__file__).parent.parent / "task_config",
-        type="yaml",
+        args_cli.config_overrides,
     )
     deploy_config, deploy_config_file = get_config(
         args_cli.deploy_config,

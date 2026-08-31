@@ -22,22 +22,45 @@ All available `task_name` options correspond to Python modules in the `envs/` di
 
 ## Task Configuration
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `save_dir` | `str` | `./data` | Root directory for saving collected data. |
-| `decimation` | `int` | `1` | Physics sub-stepping factor. |
-| `save_frequency` | `int` | `2` | Save observations every N simulation steps. |
-| `video_frequency` | `int` | `2` | Record video frames every N steps. |
-| `render_frequency` | `int` | `0` | Render GUI every N steps (`0` = headless). |
-| `random_texture` | `bool` | `false` | Enable random texture domain randomization. |
-| `use_seed` | `bool` | `true` | Use deterministic seeding for reproducibility. |
-| `episode_num` | `int` | `100` | Number of successful episodes to collect. |
-| `sensor_type` | `str` | `gsmini` | Tactile sensor type: `gsmini`, `gf225`, or `xensews`. |
-| `observations` | `dict` | — | Which observation modalities to record (see below). |
+| Field | Type | Description |
+|---|---|---|
+| `env_settings.frequencies.physical` | `int` | Physics frequency in Hz; defines `sim.dt`. |
+| `env_settings.frequencies.collect` | `int` | Collection control frequency in Hz. |
+| `env_settings.frequencies.save` | `int` | HDF5 sample frequency in Hz. |
+| `env_settings.frequencies.eval` | `int` | Evaluation control frequency in Hz. |
+| `env_settings.frequencies.video` | `int` | Video frequency in Hz (`0` disables video). |
+| `env_settings.frequencies.render` | `int` | Render frequency in Hz (`0` disables periodic rendering). |
+| `env_settings.random_texture` | `bool` | Enable random texture domain randomization. |
+| `env_settings.sensor_type` | `str` | `gsmini`, `gf225`, or `xensews`. |
+| `env_settings.optical_backend` | `str` | `taxim` or `pix2pix`. |
+| `collect_settings.save_root_dir` | `str` | Root directory for collected datasets. |
+| `collect_settings.use_seed` | `bool` | Resume deterministic seed bookkeeping. |
+| `collect_settings.episode_num` | `int` | Number of successful episodes to collect. |
+| `replay_settings.save_root_dir` | `str` | Root directory for evaluation artifacts. |
+| `replay_settings.force_action` | `bool` | Force replayed actions when enabled. |
+| `replay_settings.max_episodes` | `int` | Maximum replay episode count. |
+| `observation_settings` | `dict` | Observation modalities to record (see below). |
+
+All frequencies use `physical` as their clock reference. The launcher derives
+collection decimation as `physical / collect`, HDF5 `save_frequency` as
+`collect / save`, and evaluation decimation as `physical / eval`. Replay always
+consumes every recorded trajectory row (`action_stride=1`); `save` controls
+collection writes only and does not constrain `eval`. Non-integral clock ratios
+are rejected before Isaac Sim starts. Configuration values can be overridden
+with an OmegaConf dotlist:
+
+```bash
+python scripts/collect_data.py lift_bottle clean --headless \
+  --config-overrides collect_settings.episode_num=30
+
+python scripts/replay.py lift_bottle clean --headless \
+  --config-overrides env_settings.frequencies.eval=30 \
+                     env_settings.frequencies.video=30
+```
 
 ## Data Structure
 
-After data collection is completed, the collected data will be stored under `data/${config_name}/${task_name}/`:
+After data collection is completed, the collected data will be stored under `data/${task_name}/${config_name}/`:
 
 - Each episode's observation and action data are saved as an individual HDF5 file in the `hdf5/` directory.
 - Visualization videos of each episode (combining camera and tactile views) can be found in the `video/` directory.

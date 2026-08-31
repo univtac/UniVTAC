@@ -1,15 +1,22 @@
 import os
 import sys
+sys.path.append('.')
+
 import time
-import yaml
-import json
 import torch
 import argparse
 import traceback
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
-sys.path.append('.')
+from omegaconf import OmegaConf
+
+from envs.utils.env_parser import (
+    add_config_override_argument,
+    create_task_env,
+    load_task_config,
+    timing_plan,
+)
 
 # add argparse arguments
 parser = argparse.ArgumentParser(
@@ -27,11 +34,6 @@ parser.add_argument(
     default="demo.yml"
 )
 parser.add_argument(
-    "--episode_num",
-    type=int,
-    default=-1,
-)
-parser.add_argument(
     "--start_seed",
     type=int,
     default=-1,
@@ -46,6 +48,7 @@ parser.add_argument(
     type=str,
     default=None,
 )
+add_config_override_argument(parser)
 from isaaclab.app import AppLauncher
 AppLauncher.add_app_launcher_args(parser)
 
@@ -57,40 +60,21 @@ if args_cli.gpu is not None:
 args_cli.enable_cameras = True
 args_cli.num_envs = 1
 
-def get_config(file, default_root:Path, type:Literal['yaml', 'json']):
-    if type == 'yaml':
-        if file.endswith('.yml') or file.endswith('.yaml'):
-            file = Path(file)
-        else:
-            file = default_root / f'{file}.yml'
-        with open(file, 'r') as f:
-            config = yaml.load(f.read(), Loader=yaml.FullLoader)
-        return config, file
-    else:
-        if file.endswith('.json'):
-            file = Path(file)
-        else:
-            file = default_root / f'{file}.json'
-        with open(file, 'r') as f:
-            config = json.load(f)
-        return config, file
-
-task_config, task_config_file = get_config(
-    args_cli.config, 
-    default_root=Path(__file__).parent.parent / 'task_config', 
-    type='yaml'
+task_config, task_config_file = load_task_config(
+    args_cli.config,
+    args_cli.config_overrides,
 )
+collect_timing = timing_plan(task_config, "collect")
 
-if task_config.get('render_frequency', 1) == 0 and not args_cli.headless:
+if collect_timing.render_hz == 0 and not args_cli.headless:
     args_cli.livestream = 2
 
 # launch omniverse app, must done before importing anything from omni.isaac
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
-import importlib
 if TYPE_CHECKING:
-    from envs._base_task import BaseTask, BaseTaskCfg
+    from envs._base_task import BaseTask
 
 log_path = Path('./log')
 def log(msg):
@@ -161,59 +145,31 @@ def main():
     global args_cli, task_config, task_config_file, log_path
     task_file_name = args_cli.task
 
-    episode_num = task_config.get("episode_num", -1)
-    if args_cli.episode_num != -1:
-        episode_num = args_cli.episode_num
-    start_seed = task_config.get("start_seed", -1)
-    if args_cli.start_seed != -1:
-        start_seed = args_cli.start_seed
-    max_seed = task_config.get("max_seed", -1)
-    if args_cli.max_seed != -1:
-        max_seed = args_cli.max_seed
-    
-    task_config.update({
-        "episode_num": episode_num,
-        "start_seed": start_seed,
-        "max_seed": max_seed,
-    })
-
-    task_module = importlib.import_module(f"envs.{task_file_name}")
-    env_cfg:'BaseTaskCfg' = task_module.TaskCfg()
-    env_cfg.tactile_sensor_type = task_config.get('sensor_type', 'gsmini')
-    env_cfg.tactile_optical_backend = task_config.get('optical_backend', 'taxim')
-    env_cfg.save_dir = Path(task_config.get("save_dir", "./data")) / task_file_name / task_config_file.stem
-    env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)
-    env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)
-    env_cfg.video_frequency = task_config.get("video_frequency", env_cfg.video_frequency)
-    env_cfg.render_frequency = task_config.get("render_frequency", env_cfg.render_frequency)
-    env_cfg.reset_time_limit = task_config.get("reset_time_limit", env_cfg.reset_time_limit)
-    for option_name, option_value in task_config.get("task_overrides", {}).items():
-        if not hasattr(env_cfg, option_name):
-            raise ValueError(
-                f"Unknown task override {option_name!r} for task {task_file_name!r}"
-            )
-        setattr(env_cfg, option_name, option_value)
-    env_cfg.obs_data_type = task_config.get("observations", {})
-    env_cfg.random_texture = task_config.get("random_texture", False)
-
-    env_cfg.scene.num_envs = 1
-    
     init_start = time.perf_counter()
-    task:'BaseTask' = task_module.Task(env_cfg, mode='collect')
+    task_env = create_task_env(
+        task_file_name,
+        task_config,
+        task_config_file.stem,
+        "collect",
+        device=args_cli.device,
+    )
+    task: 'BaseTask' = task_env.task
+    env_cfg = task_env.env_cfg
     init_cost = time.perf_counter() - init_start
     
     log_path = task.save_root / f"{time.strftime(r'%Y-%m-%d_%H:%M:%S')}.log"
     log(f"Task Name: {task_file_name}")
     log(f"Config Name: {task_config_file.stem}")
-    log(f"Task Config: \n{json.dumps(task_config, ensure_ascii=False, indent=4)}\n{'-' * 20}\n")
+    log(f"Task Config:\n{OmegaConf.to_yaml(task_config, resolve=True)}{'-' * 20}\n")
+    log(f"Timing Plan: {task_env.timing}")
     log(f"Env Config: \n{env_cfg}\n{'-' * 20}\n")
     log(f"Init cost {init_cost:.2f} seconds, devices: {os.environ.get('CUDA_VISIBLE_DEVICES')}")
     run(
         task,
-        episode_num=episode_num,
-        use_seed=task_config.get("use_seed", True),
-        start_seed=start_seed,
-        max_seed=max_seed,
+        episode_num=task_config.collect_settings.episode_num,
+        use_seed=task_config.collect_settings.use_seed,
+        start_seed=args_cli.start_seed,
+        max_seed=args_cli.max_seed,
     )
 
 if __name__ == "__main__":

@@ -72,7 +72,7 @@ def create_gelsight_mini_cfg(
         ),
         device="cuda",
         debug_vis=False,  # for rendering sensor output in the gui
-        update_period=1/120,
+        update_period=update_period,
         marker_motion_sim_cfg=(
             ManiSkillSimulatorCfg(
                 device="cuda",
@@ -131,10 +131,10 @@ def create_gf225_cfg(
     gelpad_attachment_body_name: str,
     gelpad_attachment_prim_path: str = None,
     name: str = "tactile_sensor",
+    update_period = 1/120,
     data_type: list[str] = ["camera_depth", "tactile_rgb"],
 ) -> TactileCfg:
     resolution = (480, 480)  # GF225 resolution
-    update_period = 1/120
     
     sensor_cfg = GF225Cfg(
         prim_path=prim_path,
@@ -147,7 +147,7 @@ def create_gf225_cfg(
         ),
         device="cuda",
         debug_vis=False,
-        update_period=1/120,
+        update_period=update_period,
         marker_motion_sim_cfg=ManiSkillSimulatorCfg(
             tactile_img_res=resolution,
             sub_marker_num=0,
@@ -255,6 +255,7 @@ def create_tactile_cfg(
     gelpad_attachment_prim_path: str = None,
     name: str = "tactile_sensor",
     sensor_type:Literal['gsmini', 'xensews', 'gf225'] = "gsmini",
+    update_period = 1/120,
     data_type:list[str] = ["camera_depth", "tactile_rgb"],
     optical_backend: Literal["taxim", "pix2pix"] = "taxim",
 ) -> TactileCfg:
@@ -264,6 +265,7 @@ def create_tactile_cfg(
             gelpad_prim_path=gelpad_prim_path,
             gelpad_attachment_body_name=gelpad_attachment_body_name,
             name=name,
+            update_period=update_period,
             data_type=data_type,
             optical_backend=optical_backend,
         )
@@ -273,6 +275,7 @@ def create_tactile_cfg(
             gelpad_prim_path=gelpad_prim_path,
             gelpad_attachment_body_name=gelpad_attachment_body_name,
             name=name,
+            update_period=update_period,
             data_type=data_type,
         )
     elif sensor_type == "gf225":
@@ -282,6 +285,7 @@ def create_tactile_cfg(
             gelpad_attachment_body_name=gelpad_attachment_body_name,
             gelpad_attachment_prim_path=gelpad_attachment_prim_path,
             name=name,
+            update_period=update_period,
             data_type=data_type,
         )
     else:

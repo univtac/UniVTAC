@@ -6,14 +6,21 @@ sys.path.append('../')
 import os
 import time
 import json
-import yaml
 import torch
 import argparse
 import traceback
 import numpy as np
 import h5py
 from pathlib import Path
-from typing import Literal
+from omegaconf import OmegaConf
+
+from envs.utils.env_parser import (
+    FIXED_POST_REPLAY_DELAY_STEPS,
+    add_config_override_argument,
+    collection_data_dir,
+    create_task_env,
+    load_task_config,
+)
 
 from isaaclab.app import AppLauncher
 # add argparse arguments
@@ -36,34 +43,10 @@ parser.add_argument(
     default=None,
 )
 parser.add_argument(
-    "--data-root",
-    type=Path,
-    default=None,
-    help=(
-        "Dataset root containing <task_name>/<task_config> directories. "
-        "Defaults to <repo>/data."
-    ),
-)
-parser.add_argument(
-    "--data-config",
-    type=str,
-    default=None,
-    help=(
-        "Dataset configuration subdirectory. Defaults to the replay task-config "
-        "file name; use this when replaying one dataset with a different config."
-    ),
-)
-parser.add_argument(
     "--start-index",
     type=int,
     default=0,
     help="Zero-based index of the first episode to replay after sorting by file name.",
-)
-parser.add_argument(
-    "--max-episodes",
-    type=int,
-    default=None,
-    help="Maximum number of episodes to replay. Defaults to all remaining episodes.",
 )
 parser.add_argument(
     "--seeds",
@@ -75,25 +58,7 @@ parser.add_argument(
         "For example: --seeds 0 2 3."
     ),
 )
-parser.add_argument(
-    "--action-stride",
-    type=int,
-    default=None,
-    help=(
-        "Stride between HDF5 control samples. Defaults to action_stride from "
-        "the task config, or 1 to replay every recorded sample."
-    ),
-)
-parser.add_argument(
-    "--task-overrides",
-    type=json.loads,
-    default=None,
-    metavar="JSON",
-    help=(
-        "JSON object of TaskCfg fields to override after loading the replay "
-        "config, for example: '{\"can_sizes\":[4]}'."
-    ),
-)
+add_config_override_argument(parser)
 AppLauncher.add_app_launcher_args(parser)
 
 # parse the arguments
@@ -102,6 +67,11 @@ args_cli.enable_cameras = True
 args_cli.livestream = 0 if args_cli.headless else 2
 args_cli.num_envs = 1
 
+task_config, task_config_file = load_task_config(
+    args_cli.task_config,
+    args_cli.config_overrides,
+)
+
 if args_cli.gpu is not None:
     os.environ['CUDA_VISIBLE_DEVICES'] = args_cli.gpu
 
@@ -109,11 +79,10 @@ if args_cli.gpu is not None:
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
-import importlib
 from typing import TYPE_CHECKING
 from envs.utils.data import HDF5Handler
 if TYPE_CHECKING:
-    from envs._base_task import BaseTask, BaseTaskCfg
+    from envs._base_task import BaseTask
 
 log_path = Path('./log')
 def log(msg):
@@ -131,6 +100,7 @@ def replay(
     data_path: Path,
     action_stride: int,
     replay_force: bool,
+    post_replay_delay_steps: int,
 ):
     eval_start = time.perf_counter()
     task.reset(seed=seed)
@@ -246,16 +216,41 @@ def replay(
             'result_ee': observation['embodiment']['ee'][:3].cpu().tolist(),
         })
     replay_end_physics_step = task._physics_step_count
-    
-    for _ in range(50):
-        exec_succ, eval_succ = task.take_action(
-            action,
-            action_type='qpos',
-            force=replay_force,
-            is_save=False,
+
+    # ``take_action`` stops advancing physics after ``step_lim`` is reached, so
+    # the old post-replay take_action loop did not actually let released objects
+    # settle. Advance the simulation directly, include these frames in the video,
+    # and keep checking success because a short threshold crossing is valid.
+    success_during_trajectory = bool(task.eval_success)
+    success_during_post_delay = False
+    first_post_delay_success_step = None
+    if post_replay_delay_steps > 0:
+        task.logger.info(
+            f"Delaying for {post_replay_delay_steps} post-replay steps"
         )
-        if eval_succ:
-            break
+        task.atom_tag = 'delay'
+        task.atom_id += 1
+        with task._configured_decimation():
+            for delay_step in range(1, post_replay_delay_steps + 1):
+                task._step(is_save=True)
+                if task.check_success():
+                    success_during_post_delay = True
+                    task.eval_success = True
+                    if first_post_delay_success_step is None:
+                        first_post_delay_success_step = delay_step
+        task._update_render()
+    terminal_eval_success = bool(task.check_success())
+    success_latched = bool(task.eval_success or terminal_eval_success)
+    task.eval_success = success_latched
+    task.metadata['success_during_trajectory'] = success_during_trajectory
+    task.metadata['success_during_post_delay'] = success_during_post_delay
+    task.metadata['first_post_delay_success_step'] = first_post_delay_success_step
+    task.metadata['terminal_success'] = terminal_eval_success
+    task.metadata['success_latched'] = success_latched
+    terminal_actor_poses = {
+        name: pose.detach().cpu().tolist()
+        for name, pose in task._actor_manager.get_observations().items()
+    }
  
     seed_root = task.save_root / 'replay_traj'
     seed_root.mkdir(parents=True, exist_ok=True)
@@ -285,6 +280,14 @@ def replay(
         'arm_damping': task.cfg.arm_damping,
         'frame_count': len(traj_list),
         'configured_decimation': int(task.cfg.decimation),
+        'post_replay_delay_steps': int(post_replay_delay_steps),
+        'transient_eval_success': success_during_trajectory,
+        'success_during_trajectory': success_during_trajectory,
+        'success_during_post_delay': success_during_post_delay,
+        'first_post_delay_success_step': first_post_delay_success_step,
+        'terminal_eval_success': terminal_eval_success,
+        'success_latched': success_latched,
+        'terminal_actor_pose': terminal_actor_poses,
         'replay_physics_step_count': int(
             replay_end_physics_step - replay_start_physics_step
         ),
@@ -343,8 +346,7 @@ def replay(
         f"gripper MAE={summary['gripper']['mae']:.6g}."
     )
 
-    if task.eval_success:
-        succ = True
+    succ = success_latched
 
     eval_cost = time.perf_counter() - eval_start
     succ_status = 'success' if succ else 'failed'
@@ -356,6 +358,7 @@ def replay_seeds(
     data,
     action_stride: int,
     replay_force: bool,
+    post_replay_delay_steps: int,
 ):
     test_num, succ_num = 0, 0
     for seed, data_path in data:
@@ -366,6 +369,7 @@ def replay_seeds(
             data_path,
             action_stride,
             replay_force,
+            post_replay_delay_steps,
         )
         succ_num += 1 if result == 'success' else 0
         log(f"[{test_num:<3d}] Seed {seed} {result} after {eval_cost:.2f} s.\n"
@@ -378,92 +382,51 @@ def replay_seeds(
     }
 
 
-def get_config(file, default_root:Path, type:Literal['yaml', 'json']):
-    if type == 'yaml':
-        if file.endswith('.yml') or file.endswith('.yaml'):
-            file = Path(file)
-        else:
-            file = default_root / f'{file}.yml'
-        with open(file, 'r') as f:
-            config = yaml.load(f.read(), Loader=yaml.FullLoader)
-        return config, file
-    else:
-        if file.endswith('.json'):
-            file = Path(file)
-        else:
-            file = default_root / f'{file}.json'
-        with open(file, 'r') as f:
-            config = json.load(f)
-        return config, file
-
-task_module, policy_module = None, None
 def main():
-    global args_cli, task_module, policy_module, log_path
+    global args_cli, log_path
 
     task_file_name = args_cli.task_name
-    task_config_name = args_cli.task_config
-    
-    task_config, task_config_file = get_config(
-        task_config_name, default_root=Path(__file__).parent.parent / 'task_config', type='yaml'
-    )
-
-    task_module = importlib.import_module(f"envs.{task_file_name}")
-
-    curr_time = time.strftime(r'%Y-%m-%d_%H:%M:%S')
-
-    env_cfg:BaseTaskCfg = task_module.TaskCfg()
-    env_cfg.tactile_optical_backend = task_config.get("optical_backend", "taxim")
-    env_cfg.save_dir = Path('eval_result') / 'replay' / task_file_name / task_config_file.stem / curr_time
-    env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)
-    env_cfg.sim.render_interval = env_cfg.decimation
-    env_cfg.sim.render.rendering_mode = task_config.get(
-        "rendering_mode", env_cfg.sim.render.rendering_mode
-    )
-    env_cfg.obs_data_type = task_config.get("observations", {})
-    env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)
-    env_cfg.video_frequency = task_config.get("video_frequency", env_cfg.video_frequency)
-    env_cfg.random_texture = task_config.get("random_texture", False)
-    task_overrides = dict(task_config.get("task_overrides", {}))
-    if args_cli.task_overrides is not None:
-        if not isinstance(args_cli.task_overrides, dict):
-            raise ValueError("--task-overrides must decode to a JSON object.")
-        task_overrides.update(args_cli.task_overrides)
-    for option_name, option_value in task_overrides.items():
-        if not hasattr(env_cfg, option_name):
-            raise ValueError(
-                f"Unknown task override {option_name!r} for task {task_file_name!r}"
-            )
-        setattr(env_cfg, option_name, option_value)
-
-    env_cfg.scene.num_envs = 1
-    env_cfg.sim.device = args_cli.device if args_cli.device is not None \
-        else env_cfg.sim.device
 
     init_start = time.perf_counter()
-    task:BaseTask = task_module.Task(env_cfg, mode='eval')
+    task_env = create_task_env(
+        task_file_name,
+        task_config,
+        task_config_file.stem,
+        "eval",
+        device=args_cli.device,
+    )
+    task: BaseTask = task_env.task
+    env_cfg = task_env.env_cfg
     task_init_cost = time.perf_counter() - init_start
     
     log_path = task.save_root / f"log.log"
     log(f"Task Name: {task_file_name}")
-    log(f"Task Config: {task_config_file.absolute()}") 
-    log(f"Task Overrides: {json.dumps(task_overrides, ensure_ascii=False)}")
+    log(f"Task Config: {task_config_file.absolute()}")
+    log(f"Resolved Config:\n{OmegaConf.to_yaml(task_config, resolve=True)}")
+    log(f"Timing Plan: {task_env.timing}")
+    log(f"Rendering Mode: {env_cfg.sim.render.rendering_mode}")
     log(f"Task init finish in {task_init_cost:.2f} seconds.")
-    
-    project_root = Path(__file__).parent.parent
-    if args_cli.data_root is not None:
-        dataset_root = args_cli.data_root
-    else:
-        dataset_root = Path(task_config.get("data_root", project_root / 'data'))
-        if not dataset_root.is_absolute():
-            dataset_root = project_root / dataset_root
-    data_config_name = args_cli.data_config \
-        or task_config.get("data_config", task_config_file.stem)
-    data_root = dataset_root.resolve() / task_file_name / data_config_name
+
+    # The dataset configuration name is intentionally fixed to the active task
+    # config file stem.  There is no CLI/data_config override path.
+    data_root = collection_data_dir(
+        task_config,
+        task_file_name,
+        task_config_file.stem,
+    ).resolve()
     if (data_root / 'hdf5').exists():
         print(f"Found hdf5 data in {data_root / 'hdf5'}, start replaying.")
         # self collect data
         data_root = data_root / 'hdf5'
         data = sorted([(int(p.stem), p) for p in data_root.glob('*.hdf5')], key=lambda x: x[0])
+    elif any(data_root.glob('*.hdf5')):
+        # Some self-collected datasets store their HDF5 files directly in the
+        # configuration directory instead of an additional ``hdf5`` folder.
+        print(f"Found hdf5 data in {data_root}, start replaying.")
+        data = sorted(
+            [(int(p.stem), p) for p in data_root.glob('*.hdf5')],
+            key=lambda x: x[0],
+        )
     else:
         print(f"Found downloaded data in {data_root}, start replaying.")
         # dataset
@@ -489,26 +452,12 @@ def main():
 
     if args_cli.start_index < 0:
         raise ValueError("--start-index must be non-negative.")
-    max_episodes = args_cli.max_episodes
-    if max_episodes is None:
-        max_episodes = task_config.get("max_episodes")
-    if max_episodes is not None and max_episodes <= 0:
-        raise ValueError("--max-episodes must be positive.")
+    max_episodes = task_config.replay_settings.max_episodes
+    action_stride = task_env.timing.action_stride
+    replay_force = task_config.replay_settings.force_action
+    post_replay_delay_steps = FIXED_POST_REPLAY_DELAY_STEPS
 
-    action_stride = args_cli.action_stride
-    if action_stride is None:
-        action_stride = task_config.get("action_stride", 1)
-    if action_stride <= 0:
-        raise ValueError("--action-stride must be positive.")
-
-    # Position targets are tracked by the configured implicit-PD controller.
-    # Set replay_force=true only for diagnostics that intentionally teleport joints.
-    replay_force = task_config.get("replay_force", False)
-    if not isinstance(replay_force, bool):
-        raise ValueError("replay_force must be a boolean.")
-
-    stop_index = None if max_episodes is None \
-        else args_cli.start_index + max_episodes
+    stop_index = args_cli.start_index + max_episodes
     data = data[args_cli.start_index:stop_index]
 
     if not data:
@@ -517,7 +466,8 @@ def main():
     log(
         f"Start replaying {len(data)} seeds from {data_root} with "
         f"action_stride={action_stride}, decimation={env_cfg.decimation}, "
-        f"force={replay_force}."
+        f"force={replay_force}, post_replay_delay_steps="
+        f"{post_replay_delay_steps}."
     )
 
     results = replay_seeds(
@@ -525,6 +475,7 @@ def main():
         data=data,
         action_stride=action_stride,
         replay_force=replay_force,
+        post_replay_delay_steps=post_replay_delay_steps,
     )
     log(f"Final Result: {results['succ_num']}/{results['test_num']}({results['succ_num']/results['test_num']*100:.2f}%) success.")
     

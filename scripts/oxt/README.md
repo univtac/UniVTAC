@@ -6,10 +6,14 @@
 bash data/download.sh setup
 bash data/download.sh download
 bash data/download.sh convert
-bash data/download.sh package
-bash data/download.sh upload --dry-run
 bash data/download.sh upload
+bash data/download.sh submit --dry-run
+bash data/download.sh submit
 ```
+
+其中 `upload` 是本地准备步骤；如果希望使用更准确的命令名，也可以执行与它等价的
+`bash data/download.sh package`。两者不要连续执行，否则第二次打包会因归档已存在而停止；
+需要主动重建时可添加 `--overwrite`。
 
 建议在独立 Python/Conda 环境中执行 `setup`，避免数据工具依赖影响 Isaac Sim 环境。
 
@@ -27,7 +31,7 @@ bash data/download.sh all
   ModelScope revision `3d4646a7`，不要无审查地改回 `master`。
 - `OXT_DATASET_ID`：新建的转换后数据集，默认 `byml2024/UniVTAC-OXT`。
 - `DOWNLOAD_WORKERS`、`CONVERT_WORKERS`、`UPLOAD_WORKERS`：三阶段并行度。
-- `MODELSCOPE_API_TOKEN`：上传 token；也可先执行 `modelscope login`。
+- `MODELSCOPE_API_TOKEN`：提交 token；也可先执行 `modelscope login`。
 - `MODELSCOPE_LICENSE`：新数据集许可证，默认 `MIT`，正式发布前应与原数据授权再次核对。
 
 `download` 使用 ModelScope 的文件级 worker，只下载每个 task 的 HDF5 和 metadata；
@@ -39,6 +43,10 @@ episode id 稳定合并，避免并发追加同一个 Zarr。转换完成后生�
 和 `submission/OXT_Submission_UniVTAC/institution_ScaleLab@SJTU.png`。Logo 从上海交通大学
 官方视觉形象识别系统下载。完整数据生成后，还需要使用 OXT-QC 当前版本执行 metadata
 precheck 和 VLM/QC，并将其输出加入 submission 目录，再向 OXT-QC 提交 PR。
+
+`upload` 只在当前设备上执行 `package`，并把待上传内容保存在
+`data/oxt/UniVTAC-OXT/publish/`，不会创建远程数据集或提交文件。检查本地结果后，只有显式
+执行 `submit` 才会连接 ModelScope；可先运行 `submit --dry-run` 核对目录和文件数量。
 
 ## 已确定的转换口径
 
@@ -65,9 +73,9 @@ precheck 和 VLM/QC，并将其输出加入 submission 目录，再向 OXT-QC �
 
 ```bash
 DOWNLOAD_WORKERS=16 CONVERT_WORKERS=8 bash data/download.sh all
-bash data/download.sh upload --dry-run
-bash data/download.sh upload
+bash data/download.sh submit --dry-run
+bash data/download.sh submit
 ```
 
-`all` 有意不包含上传，避免转换完成后未经人工检查就产生外部发布。正式上传前至少核对
+`all` 和 `upload` 都不会进行远程提交，避免转换完成后未经人工检查就产生外部发布。正式提交前至少核对
 `conversion_manifest.json` 中的 task/trajectory/frame 总数和许可证。

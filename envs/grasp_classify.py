@@ -36,8 +36,8 @@ class Task(BaseTask):
         super().__init__(cfg, mode, render_mode, **kwargs)
 
     def create_actors(self):
-        green_pose = Pose([0.4, 0.08, 0.01], [1, 0, 0, 0])
-        orange_pose = Pose([0.4, -0.08, 0.01], [1, 0, 0, 0])
+        green_pose = Pose([0.4, 0.08, 0.002], [1, 0, 0, 0])
+        orange_pose = Pose([0.4, -0.08, 0.002], [1, 0, 0, 0])
 
         self.green_pad = self._actor_manager.add_from_usd_file(
             name='green_pad',

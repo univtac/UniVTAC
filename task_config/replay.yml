@@ -1,26 +1,27 @@
-save_dir: ./data
+env_settings:
+  frequencies:
+    physical: 120
+    collect: 120
+    save: 60
+    video: 60
+    eval: 60
+    render: 0
 
-# Reuse the exact ten-file-per-task ModelScope subset from the reference run.
-data_root: data
-data_config: clean
-max_episodes: 10
+  random_texture: false
+  sensor_type: gsmini
+  optical_backend: taxim
 
-# The public dataset already stores one control target every two physics steps.
-decimation: 2
-action_stride: 1
-replay_force: false
+collect_settings:
+  save_root_dir: data
+  use_seed: true
+  episode_num: 10
 
-save_frequency: 1
-video_frequency: 0
-render_frequency: 0
-rendering_mode: performance
+replay_settings:
+  save_root_dir: eval_result
+  force_action: false
+  max_episodes: 10
 
-random_texture: false
-
-sensor_type: gsmini
-optical_backend: taxim
-
-observations:
+observation_settings:
   camera: ['rgb']
   tactile: ['rgb', 'rgb_marker', 'marker', 'depth', 'press_depth', 'pose']
   embodiment: ['joint', 'ee']

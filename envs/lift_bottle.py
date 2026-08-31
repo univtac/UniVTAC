@@ -12,7 +12,7 @@ class Task(BaseTask):
         super().__init__(cfg, mode, render_mode, **kwargs)
     
     def create_actors(self):
-        wall_pose = Pose([0.75, 0.0, 0.005], [1, 0, 0, 0])
+        wall_pose = Pose([0.75, 0.0, 0.001], [1, 0, 0, 0])
         bottle_pose = wall_pose.add_bias([-0.08, 0.0, 0.03])
 
         self.wall = self._actor_manager.add_from_usd_file(
@@ -31,6 +31,8 @@ class Task(BaseTask):
         bottle_offset = self.create_noise([0.01, 0.05, 0.0], [0, 0, np.pi/18])
         bottle_pose = self.wall.get_pose().add_bias([-0.08, 0.0, 0.03]).add_offset(bottle_offset)
         self.bottle.set_pose(bottle_pose)
+
+        self.metadata['bottle_pose'] = bottle_pose
 
     def pre_move(self):
         self.delay(10)
@@ -58,7 +60,7 @@ class Task(BaseTask):
         
     def _play_once(self):
         self.move(self.atom.close_gripper())
-        self.gripper_rotate(self.bottle, 75/180*np.pi, steps=4)
+        self.gripper_rotate(self.bottle, 70/180*np.pi, steps=4)
         if not self.check_mid_success():
             self.move(self.atom.move_by_displacement(
                 rpy=[0, np.pi/6, 0], rpy_coord='gripper'
@@ -71,8 +73,9 @@ class Task(BaseTask):
 
     def check_mid_success(self):
         rel_pose = self.bottle.get_pose().rebase(self.target_pose)
+        self.metadata['mid_rel_pose'] = rel_pose
         return rel_pose[0] > -0.01 \
-            and np.abs(np.dot(rel_pose.to_transformation_matrix()[:3, 0], np.array([0, 0, 1]))) > 0.85
+            and np.abs(np.dot(rel_pose.to_transformation_matrix()[:3, 0], np.array([0, 0, 1]))) > 0.99
     
     def check_early_stop(self):
         rel_pose = self.bottle.get_pose().rebase(self.target_pose)
@@ -82,5 +85,6 @@ class Task(BaseTask):
 
     def check_success(self):
         rel_pose = self.bottle.get_pose().rebase(self.target_pose)
+        self.metadata['rel_pose'] = rel_pose
         return rel_pose[0] > -0.02 and np.all(np.abs(rel_pose[1:3]) < np.array([0.1, 0.001])) \
             and np.abs(np.dot(rel_pose.to_transformation_matrix()[:3, 0], np.array([0, 0, 1]))) > 0.99

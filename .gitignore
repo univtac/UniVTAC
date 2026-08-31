@@ -30,8 +30,19 @@ policy/ACT_UniT
 /policy/**/*.png
 /policy/**/*.pkl
 /policy/**/*.ckpt
+/policy/**/*.log
 
 /.env
 /.venv/
 /.cache/
 /.localrc.sh
+
+encoder/**/*.pth
+encoder/**/*.log
+/logs
+
+policy/T3/**/*.pt
+policy/T3/outputs
+policy/T3/checkpoints
+
+encoder/ablation/supervision

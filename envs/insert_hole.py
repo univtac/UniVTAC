@@ -10,9 +10,9 @@ class Task(BaseTask):
         super().__init__(cfg, mode, render_mode, **kwargs)
 
     def create_actors(self):
-        slot_pose = Pose([0.6, 0.0, 0.002], [1, 0, 0, 0])
-        base_pose = Pose([0.4, 0.0, 0.002], [1, 0, 0, 0])
-        prism_pose = Pose([0.4, 0.0, 0.005], [1, 0, 0, 0])
+        slot_pose = Pose([0.6, 0.0, 0.001], [1, 0, 0, 0])
+        base_pose = Pose([0.4, 0.0, 0.001], [1, 0, 0, 0])
+        prism_pose = Pose([0.4, 0.0, 0.003], [1, 0, 0, 0])
 
         self.slot = self._actor_manager.add_from_usd_file(
             name='slot',

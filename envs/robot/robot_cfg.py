@@ -63,6 +63,7 @@ class RobotCfg:
 def create_franka_gsmini_gripper(
     data_type: list[str],
     optical_backend: Literal["taxim", "pix2pix"] = "taxim",
+    update_period: float = 1 / 120,
     arm_stiffness: float = DEFAULT_ARM_STIFFNESS,
     arm_damping: float = DEFAULT_ARM_DAMPING,
 ):
@@ -89,6 +90,7 @@ def create_franka_gsmini_gripper(
             gelpad_attachment_body_name="gelsight_mini_case_left",
             name="left_tactile",
             sensor_type="gsmini",
+            update_period=update_period,
             data_type=data_type,
             optical_backend=optical_backend,
         ),
@@ -98,6 +100,7 @@ def create_franka_gsmini_gripper(
             gelpad_attachment_body_name="gelsight_mini_case_right",
             name="right_tactile",
             sensor_type="gsmini",
+            update_period=update_period,
             data_type=data_type,
             optical_backend=optical_backend,
         )
@@ -115,6 +118,7 @@ def create_franka_gsmini_gripper(
 
 def create_franka_gf225_gripper(
     data_type: list[str],
+    update_period: float = 1 / 120,
     arm_stiffness: float = DEFAULT_ARM_STIFFNESS,
     arm_damping: float = DEFAULT_ARM_DAMPING,
 ):
@@ -141,6 +145,7 @@ def create_franka_gf225_gripper(
             gelpad_attachment_body_name="GF225_left",
             name="left_tactile",
             sensor_type="gf225",
+            update_period=update_period,
             data_type=data_type,
         ),
         create_tactile_cfg(
@@ -149,6 +154,7 @@ def create_franka_gf225_gripper(
             gelpad_attachment_body_name="GF225_right",
             name="right_tactile",
             sensor_type="gf225",
+            update_period=update_period,
             data_type=data_type,
         )
     ]
@@ -165,6 +171,7 @@ def create_franka_gf225_gripper(
 
 def create_franka_xensews_gripper(
     data_type: list[str],
+    update_period: float = 1 / 120,
     arm_stiffness: float = DEFAULT_ARM_STIFFNESS,
     arm_damping: float = DEFAULT_ARM_DAMPING,
 ):
@@ -191,6 +198,7 @@ def create_franka_xensews_gripper(
             gelpad_attachment_body_name="XenseWS_left",
             name="left_tactile",
             sensor_type="xensews",
+            update_period=update_period,
             data_type=data_type,
         ),
         create_tactile_cfg(
@@ -199,6 +207,7 @@ def create_franka_xensews_gripper(
             gelpad_attachment_body_name="XenseWS_right",
             name="right_tactile",
             sensor_type="xensews",
+            update_period=update_period,
             data_type=data_type,
         )
     ]

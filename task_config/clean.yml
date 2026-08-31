@@ -1,21 +1,30 @@
-save_dir: ./data
+env_settings:
+  frequencies:
+    physical: 120
+    collect: 120
+    save: 60
+    video: 60
+    eval: 60
+    render: 0
 
-decimation: 1
+  random_texture: false
+  sensor_type: gsmini
+  optical_backend: taxim
 
-save_frequency: 2
-video_frequency: 2
-render_frequency: 0 # set to 1 to one IsaacSim App window
+collect_settings:
+  save_root_dir: data
+  use_seed: true
+  episode_num: 5
 
-random_texture: false # set to true to enable random texture
+replay_settings:
+  save_root_dir: eval_result
+  force_action: false
+  max_episodes: 10
 
-use_seed: true
-episode_num: 5
-
-sensor_type: gsmini
-optical_backend: taxim # taxim or pix2pix; selected before Isaac Sim starts
-
-observations:
+observation_settings:
   camera: ['rgb']
   tactile: ['rgb', 'rgb_marker', 'marker', 'depth', 'press_depth', 'pose']
   embodiment: ['joint', 'ee']
   actor: true
+
+task_overrides: {}

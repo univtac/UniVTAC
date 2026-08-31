@@ -1,5 +1,8 @@
 import os
 import sys
+sys.path.append('.')
+sys.path.append('./policy')
+
 import time
 import json
 import yaml
@@ -7,14 +10,21 @@ import argparse
 import importlib
 import traceback
 import io
+from omegaconf import OmegaConf
 from tqdm import tqdm
 from queue import Empty
 from pathlib import Path
 from typing import Literal, TYPE_CHECKING
 from multiprocessing import Process, Queue, Manager, Event, current_process
 
+from envs.utils.env_parser import (
+    add_config_override_argument,
+    create_task_env,
+    load_task_config,
+)
+
 if TYPE_CHECKING:
-    from envs._base_task import BaseTask, BaseTaskCfg
+    from envs._base_task import BaseTask
     from policy._base_policy import BasePolicy
 
 
@@ -42,7 +52,7 @@ def split_devices(cuda_visible_devices: str, workers: int):
     return assignment
 
 
-def worker_run(args, deploy_config, task_config, task_file_name, policy_name,
+def worker_run(args, deploy_config, task_config, task_config_name, task_file_name, policy_name,
                instructions, base_save_dir: Path, seed_q: Queue, progress, stop_event: Event,
                log_file: Path, device_list, status_dict, result_q: Queue):
     # Per-process env: set CUDA_VISIBLE_DEVICES
@@ -70,20 +80,11 @@ def worker_run(args, deploy_config, task_config, task_file_name, policy_name,
 
     try:
         # Dynamic imports after app launch
-        task_module = importlib.import_module(f"envs.{task_file_name}")
         policy_module = importlib.import_module(f"policy.{policy_name}")
 
-        env_cfg:'BaseTaskCfg' = task_module.TaskCfg()
-        env_cfg.tactile_optical_backend = task_config.get("optical_backend", "taxim")
         # Each worker gets its own save_dir under base + worker id
         worker_id = current_process().name.split('-')[-1]  # e.g., Process-1 -> '1'
         worker_save_dir = base_save_dir / worker_id
-        env_cfg.save_dir = worker_save_dir
-        env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)
-        env_cfg.obs_data_type = task_config.get("observations", {})
-        env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)
-        env_cfg.video_frequency = task_config.get("video_frequency", env_cfg.video_frequency)
-        env_cfg.scene.num_envs = 1
 
         # Device stays default; CUDA env controls GPU routing
         init_start = time.perf_counter()
@@ -91,7 +92,14 @@ def worker_run(args, deploy_config, task_config, task_file_name, policy_name,
         policy_init_cost = time.perf_counter() - init_start
 
         init_start = time.perf_counter()
-        task:'BaseTask' = task_module.Task(env_cfg, mode='eval')
+        task_env = create_task_env(
+            task_file_name,
+            task_config,
+            task_config_name,
+            "eval",
+            save_dir=worker_save_dir,
+        )
+        task: 'BaseTask' = task_env.task
 
         # Override _step_callback to update status_dict
         original_step_callback = task._step_callback
@@ -214,13 +222,15 @@ def main():
     parser.add_argument("--total_num", type=int, default=100, help="Total tests across all workers")
     parser.add_argument("--gpu", type=str, default=os.environ.get('CUDA_VISIBLE_DEVICES', ''),
                         help="CUDA_VISIBLE_DEVICES list to split among workers")
+    add_config_override_argument(parser)
     args = parser.parse_args()
     
     train_config = os.environ.get('TRAIN_CONFIG', 'Unknown')
 
     # Load configs
-    task_config, task_config_file = get_config(
-        args.task_config, default_root=Path(__file__).parent.parent / 'task_config', type='yaml'
+    task_config, task_config_file = load_task_config(
+        args.task_config,
+        args.config_overrides,
     )
     deploy_config, deploy_config_file = get_config(
         args.deploy_config, default_root=Path(__file__).parent.parent / 'policy', type='yaml'
@@ -241,7 +251,13 @@ def main():
 
     # Base save dir with unified date
     curr_time = time.strftime(r'%Y-%m-%d_%H:%M:%S')
-    base_save_dir = Path('eval_result') / policy_name / args.task_name / deploy_config_file.stem / curr_time
+    base_save_dir = (
+        Path(str(task_config.replay_settings.save_root_dir))
+        / policy_name
+        / args.task_name
+        / deploy_config_file.stem
+        / curr_time
+    )
     base_save_dir.mkdir(parents=True, exist_ok=True)
     out_log = base_save_dir / 'out.log'
     clean_log = base_save_dir / 'log.log'
@@ -293,6 +309,11 @@ def main():
     deploy_json = json.dumps(deploy_config, ensure_ascii=False, indent=4)
     write_clean(deploy_json)
     write_out(deploy_json)
+    write_clean("Task config:")
+    write_out("Task config:")
+    task_yaml = OmegaConf.to_yaml(task_config, resolve=True)
+    write_clean(task_yaml)
+    write_out(task_yaml)
 
     workers = []
     worker_status = []
@@ -302,7 +323,7 @@ def main():
         p = Process(
             target=worker_run,
             name=f"Worker-{w+1}",
-            args=(args, deploy_config, task_config, args.task_name, policy_name, instructions,
+            args=(args, deploy_config, task_config, task_config_file.stem, args.task_name, policy_name, instructions,
                   base_save_dir, seed_q, progress, stop_event, out_log, assignments[w], status_proxy, result_q)
         )
         p.start()

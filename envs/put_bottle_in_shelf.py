@@ -13,7 +13,7 @@ class Task(BaseTask):
         super().__init__(cfg, mode, render_mode, **kwargs)
     
     def create_actors(self):
-        base_pose = Pose([0.9, 0.0, 0.01], [1, 0, 0, 0])
+        base_pose = Pose([0.9, 0.0, 0.001], [1, 0, 0, 0])
         bottle_pose = Pose([0.5, 0.0, 0.01], [1, 0, 0, 0])
 
         self.shelf = self._actor_manager.add_from_usd_file(

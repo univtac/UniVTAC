@@ -110,14 +110,16 @@ sensors:
 
 ```bash
 OMNI_KIT_ACCEPT_EULA=YES python scripts/collect_data.py \
-  grasp_classify demo --episode_num 1 --max_seed 0 --headless
+  grasp_classify demo --max_seed 0 --headless \
+  --config-overrides collect_settings.episode_num=1
 ```
 
 The optical backend is selected before environment startup in task YAML:
 
 ```yaml
-sensor_type: gsmini
-optical_backend: taxim  # or pix2pix
+env_settings:
+  sensor_type: gsmini
+  optical_backend: taxim  # or pix2pix
 ```
 
 The pretrained Pix2Pix checkpoint is already vendored under the GelSight Mini

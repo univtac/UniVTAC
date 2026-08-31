@@ -12,6 +12,13 @@ import argparse
 import traceback
 from pathlib import Path
 from typing import Literal
+from omegaconf import OmegaConf
+
+from envs.utils.env_parser import (
+    add_config_override_argument,
+    create_task_env,
+    load_task_config,
+)
 
 from isaaclab.app import AppLauncher
 # add argparse arguments
@@ -57,6 +64,7 @@ parser.add_argument(
     "--print_only",
     action='store_true',
 )
+add_config_override_argument(parser)
 AppLauncher.add_app_launcher_args(parser)
 
 # parse the arguments
@@ -64,6 +72,11 @@ args_cli = parser.parse_args()
 args_cli.enable_cameras = True
 args_cli.livestream = 2
 args_cli.num_envs = 1
+
+task_config, task_config_file = load_task_config(
+    args_cli.task_config,
+    args_cli.config_overrides,
+)
 
 # launch omniverse app, must done before importing anything from omni.isaac
 app_launcher = AppLauncher(args_cli)
@@ -73,7 +86,7 @@ import traceback
 import importlib
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from envs._base_task import BaseTask, BaseTaskCfg
+    from envs._base_task import BaseTask
     from policy._base_policy import BasePolicy
 
 log_path = Path('./log')
@@ -193,9 +206,6 @@ def main():
     global args_cli, task_module, policy_module, log_path
 
     task_file_name = args_cli.task_name
-    task_config, task_config_file = get_config(
-        args_cli.task_config, default_root=Path(__file__).parent.parent / 'task_config', type='yaml'
-    )
     deploy_config, deploy_config_file = get_config(
         args_cli.deploy_config, default_root=Path(__file__).parent.parent / 'policy', type='yaml'
     )
@@ -216,23 +226,17 @@ def main():
     else:
         instructions = {'seen': ['Empty'], 'unseen': ['Empty']}
 
-    task_module = importlib.import_module(f"envs.{task_file_name}")
     policy_module = importlib.import_module(f"policy.{policy_name}")
     
     curr_time = time.strftime(r'%Y-%m-%d_%H:%M:%S')
 
-    env_cfg:BaseTaskCfg = task_module.TaskCfg()
-    env_cfg.tactile_optical_backend = task_config.get("optical_backend", "taxim")
-    env_cfg.save_dir = Path('eval_result') / policy_name / task_file_name / deploy_config_file.stem / curr_time
-    env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)
-    env_cfg.obs_data_type = task_config.get("observations", {})
-    env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)
-    env_cfg.video_frequency = task_config.get("video_frequency", env_cfg.video_frequency)
-    env_cfg.random_texture = task_config.get("random_texture", False)
-
-    env_cfg.scene.num_envs = 1
-    env_cfg.sim.device = args_cli.device if args_cli.device is not None \
-        else env_cfg.sim.device
+    save_dir = (
+        Path(str(task_config.replay_settings.save_root_dir))
+        / policy_name
+        / task_file_name
+        / deploy_config_file.stem
+        / curr_time
+    )
     seed = deploy_config.get("seed", 0)
 
     init_start = time.perf_counter()
@@ -240,12 +244,22 @@ def main():
     policy_init_cost = time.perf_counter() - init_start
 
     init_start = time.perf_counter()
-    task:BaseTask = task_module.Task(env_cfg, mode='eval')
+    task_env = create_task_env(
+        task_file_name,
+        task_config,
+        task_config_file.stem,
+        "eval",
+        device=args_cli.device,
+        save_dir=save_dir,
+    )
+    task: BaseTask = task_env.task
     task_init_cost = time.perf_counter() - init_start
     
     log_path = task.save_root / f"log.log"
     log(f"Task Name: {task_file_name}")
-    log(f"Task Config: {task_config_file.absolute()}") 
+    log(f"Task Config: {task_config_file.absolute()}")
+    log(f"Resolved Task Config:\n{OmegaConf.to_yaml(task_config, resolve=True)}")
+    log(f"Timing Plan: {task_env.timing}")
     log(f"Eval Config: {json.dumps(deploy_config, ensure_ascii=False, indent=4)}\n{'-' * 20}\n") 
     log(f"Task init finish in {task_init_cost:.2f} seconds.")
     log(f"Policy init finish in {policy_init_cost:.2f} seconds.")

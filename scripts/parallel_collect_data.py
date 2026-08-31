@@ -1,33 +1,29 @@
 import os
 import sys
+sys.path.append('.')
+
 import time
 import json
-import yaml
 import argparse
-import importlib
 import traceback
 import io
+from omegaconf import OmegaConf
 from tqdm import tqdm
 from queue import Empty
 from pathlib import Path
-from typing import Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from multiprocessing import Process, Queue, Manager, Event, current_process
 
+from envs.utils.env_parser import (
+    add_config_override_argument,
+    collection_data_dir,
+    create_task_env,
+    load_task_config,
+    timing_plan,
+)
+
 if TYPE_CHECKING:
-    from envs._base_task import BaseTask, BaseTaskCfg
-
-
-def get_config(file, default_root: Path, type: Literal['yaml', 'json']):
-    if type == 'yaml':
-        file = Path(file) if (file.endswith('.yml') or file.endswith('.yaml')) else (default_root / f'{file}.yml')
-        with open(file, 'r') as f:
-            config = yaml.load(f.read(), Loader=yaml.FullLoader)
-        return config, file
-    else:
-        file = Path(file) if file.endswith('.json') else (default_root / f'{file}.json')
-        with open(file, 'r') as f:
-            config = json.load(f)
-        return config, file
+    from envs._base_task import BaseTask
 
 
 def split_devices(cuda_visible_devices: str, workers: int):
@@ -40,7 +36,7 @@ def split_devices(cuda_visible_devices: str, workers: int):
     return assignment
 
 
-def worker_run(task_config, task_file_name, base_save_dir: Path, seed_q: Queue,
+def worker_run(task_config, task_file_name, config_name, base_save_dir: Path, seed_q: Queue,
                progress, stop_event: Event, log_file: Path, device_list,
                status_dict, result_q: Queue):
     # Per-process env: assign CUDA devices
@@ -59,29 +55,24 @@ def worker_run(task_config, task_file_name, base_save_dir: Path, seed_q: Queue,
     app_args = parser.parse_args([])
     app_args.enable_cameras = True
     app_args.num_envs = 1
-    if task_config.get('render_frequency', 1) == 0:
+    if timing_plan(task_config, "collect").render_hz == 0:
         app_args.livestream = 2
 
     app_launcher = AppLauncher(app_args)
     simulation_app = app_launcher.app
 
     try:
-        task_module = importlib.import_module(f"envs.{task_file_name}")
-
-        env_cfg: 'BaseTaskCfg' = task_module.TaskCfg()
-        env_cfg.tactile_optical_backend = task_config.get("optical_backend", "taxim")
         worker_id = current_process().name.split('-')[-1]
-        env_cfg.save_dir = base_save_dir
-        env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)
-        env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)
-        env_cfg.video_frequency = task_config.get("video_frequency", env_cfg.video_frequency)
-        env_cfg.render_frequency = task_config.get("render_frequency", env_cfg.render_frequency)
-        env_cfg.obs_data_type = task_config.get("observations", {})
-        env_cfg.scene.num_envs = 1
-        # Device routing by CUDA env
 
         init_start = time.perf_counter()
-        task: 'BaseTask' = task_module.Task(env_cfg, mode='collect')
+        task_env = create_task_env(
+            task_file_name,
+            task_config,
+            config_name,
+            "collect",
+            save_dir=base_save_dir,
+        )
+        task: 'BaseTask' = task_env.task
 
         # Override _step_callback to update status_dict
         original_step_callback = task._step_callback
@@ -213,21 +204,22 @@ def main():
     parser.add_argument("task", type=str, help="Task file name")
     parser.add_argument("config", type=str, help="Config file name")
     parser.add_argument("--workers", type=int, default=2, help="Number of worker processes")
-    parser.add_argument("--episodes", type=int, default=None, help="Total successful episodes to collect (override config episode_num)")
     parser.add_argument("--gpu", type=str, default=os.environ.get('CUDA_VISIBLE_DEVICES', ''),
                         help="CUDA_VISIBLE_DEVICES list to split among workers")
+    add_config_override_argument(parser)
     args = parser.parse_args()
 
-    task_config, task_config_file = get_config(
+    task_config, task_config_file = load_task_config(
         args.config,
-        default_root=Path(__file__).parent.parent / 'task_config',
-        type='yaml'
+        args.config_overrides,
     )
-    target_episodes = args.episodes if args.episodes is not None else task_config.get("episode_num", 10)
+    target_episodes = task_config.collect_settings.episode_num
 
     # Base save dir with timestamp; per-worker subfolders appended inside worker
     curr_time = time.strftime(r'%Y-%m-%d_%H:%M:%S')
-    base_save_dir = Path(task_config.get("save_dir", "./data")) / args.task / task_config_file.stem
+    base_save_dir = collection_data_dir(
+        task_config, args.task, task_config_file.stem
+    )
     base_save_dir.mkdir(parents=True, exist_ok=True)
     out_log = base_save_dir / f'{curr_time}.out'
     clean_log = base_save_dir / f'{curr_time}.log'
@@ -249,11 +241,7 @@ def main():
         with open(clean_log, 'a') as f:
             f.write(stamped + '\n')
 
-    # Start seed logic: use config start_seed if provided, else 0
-    start_seed = task_config.get("start_seed", 0)
-    if start_seed is None:
-        start_seed = 0
-    next_seed = start_seed
+    next_seed = 0
 
     assignments = split_devices(args.gpu, args.workers)
 
@@ -272,7 +260,7 @@ def main():
     write_out(params_json)
     write_clean("Task config:")
     write_out("Task config:")
-    task_json = json.dumps(task_config, ensure_ascii=False, indent=4)
+    task_json = OmegaConf.to_yaml(task_config, resolve=True)
     write_clean(task_json)
     write_out(task_json)
 
@@ -284,7 +272,7 @@ def main():
         p = Process(
             target=worker_run,
             name=f"Worker-{w+1}",
-            args=(task_config, args.task, base_save_dir, seed_q, progress, stop_event, out_log, assignments[w], status_proxy, result_q)
+            args=(task_config, args.task, task_config_file.stem, base_save_dir, seed_q, progress, stop_event, out_log, assignments[w], status_proxy, result_q)
         )
         p.start()
         workers.append(p)

@@ -33,7 +33,7 @@ class Task(BaseTask):
         super().__init__(cfg, mode, render_mode, **kwargs)
 
     def create_actors(self):
-        stand_pose = Pose([0.7, 0.0, 0.005], [1, 0, 0, 0])
+        stand_pose = Pose([0.7, 0.0, 0.001], [1, 0, 0, 0])
         prism_pose = stand_pose.add_bias([0, 0, 0.06])
         self.stand = self._actor_manager.add_from_usd_file(
             name='stand',
