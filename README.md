@@ -6,7 +6,7 @@
 **UniVTAC** is a tactile-aware simulation benchmark for robotic manipulation built on top of **NVIDIA Isaac Lab** and **TacEx (UIPC-based tactile simulation)**. It provides a unified framework for collecting expert demonstrations, training visuotactile policies, and evaluating them across a diverse suite of contact-rich manipulation tasks — all with high-fidelity tactile feedback from simulated GelSight Mini, ViTai GF225, or XenseWS sensors.
 
 > [!IMPORTANT]
-> The `main` branch targets Isaac Sim 5.1, while the `isaac45` branch preserves
+> The `isaac51` branch targets Isaac Sim 5.1, while the `main` branch preserves
 > support for Isaac Sim 4.5. The Isaac Sim 5.1 release delivers up to **5x
 > higher data-collection throughput** than the Isaac Sim 4.5 version and
 > supports NVIDIA RTX 40- and 50-series GPUs. Data collected with the two
