@@ -41,6 +41,17 @@ See the [Data Collection Guide](./docs/Collection.md) for instructions on how to
 
 Dataset containing 100 episodes per task can be downloaded from [HuggingFace](https://huggingface.co/datasets/byml/UniVTAC), [Modelscope](https://modelscope.cn/datasets/byml2024/UniVTAC) or by running the script in `data/download.sh`.
 
+## Data Export
+
+Raw UniVTAC episodes can be exported to the [TLabel](https://github.com/liesliy/tlabel) unified tactile annotation format (a COCO-style common schema for robot tactile data) for cross-dataset labelling and benchmarking:
+
+```bash
+pip install tlabel
+python -m policy.tlabel_data_preprocessor <task_name> <task_config> <episode_num> --output ./data/tlabel/<task_name>-<task_config>
+```
+
+See the [TLabel Export Guide](./docs/TLabelExport.md) for the supported fields, output schema, CLI options and the new/old HDF5 format compatibility notes.
+
 ## Train & Eval Policies
 
 UniVTAC includes several baseline policies implemented under the `policy/` directory:
