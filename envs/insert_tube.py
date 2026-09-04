@@ -99,7 +99,7 @@ class Task(BaseTask):
  
     def check_mid_success(self):
         prism_pose = self.prism.get_pose().rebase(self.hole_pose)
-        return np.all(prism_pose.p[:2] < np.array([0.005, 0.005])) and prism_pose.p[2] < -0.02 and\
+        return np.all(np.abs(prism_pose.p[:2]) < np.array([0.005, 0.005])) and prism_pose.p[2] < -0.02 and\
             np.dot(prism_pose.to_transformation_matrix()[:3, 2], np.array([0, 0, 1])) > 0.99 # 8°
 
     def check_early_stop(self):
@@ -117,6 +117,6 @@ class Task(BaseTask):
             self._robot_manager.get_gripper_center_pose())
         self.metadata['rel_pose'] = prism_pose.tolist()
         self.metadata['inhand_bias'] = np.abs(self.origin_inhand_pose[2] - prism_inhand_pose[2])
-        return np.all(prism_pose.p[:2] < np.array([0.005, 0.005])) and prism_pose.p[2] < -z_threshold \
+        return np.all(np.abs(prism_pose.p[:2]) < np.array([0.005, 0.005])) and prism_pose.p[2] < -z_threshold \
             and np.dot(prism_pose.to_transformation_matrix()[:3, 2], np.array([0, 0, 1])) > 0.965 \
             and np.abs(self.origin_inhand_pose[2] - prism_inhand_pose[2]) < 0.03

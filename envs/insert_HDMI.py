@@ -110,7 +110,7 @@ class Task(BaseTask):
         prism_pose = self.prism.get_pose().rebase(self.target_pose)
         ee_pose = self._robot_manager.get_ee_pose()
         self.metadata['rel_pose'] = prism_pose.tolist()
-        return np.all(np.abs(prism_pose.p[1:2]) < np.array([0.005, 0.005])) \
+        return np.all(np.abs(prism_pose.p[0:2]) < np.array([0.005, 0.005])) \
             and prism_pose.p[2] < z_threshold \
             and ee_pose[2] > 0.145 and \
             np.dot(prism_pose.to_transformation_matrix()[:3, 2], np.array([0, 0, 1])) > 0.965 # 15°
