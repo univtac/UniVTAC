@@ -95,6 +95,17 @@ parallelism, and force-download options.
 > The currently released policy checkpoints are associated with the Isaac Sim
 > 4.5 demonstrations. They should not be treated as Isaac Sim 5.1 checkpoints.
 
+## Data Export
+
+Raw UniVTAC episodes can be exported to the [TLabel](https://github.com/liesliy/tlabel) unified tactile annotation format (a COCO-style common schema for robot tactile data) for cross-dataset labelling and benchmarking:
+
+```bash
+pip install tlabel
+python -m policy.tlabel_data_preprocessor <task_name> <task_config> <episode_num> --output ./data/tlabel/<task_name>-<task_config>
+```
+
+See the [TLabel Export Guide](./docs/TLabelExport.md) for the supported fields, output schema, CLI options and the new/old HDF5 format compatibility notes.
+
 ## Train & Eval Policies
 
 UniVTAC includes several baseline policies implemented under the `policy/` directory:
